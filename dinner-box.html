@@ -1,0 +1,684 @@
+﻿<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Dinner Box</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="header-row">
+    <div>
+      <h1>The Main Meal</h1>
+      <p class="subtitle" id="countLabel">0 ideas on file</p>
+    </div>
+    <button class="btn-primary" id="addBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add dinner
+    </button>
+  </div>
+
+  <div class="form-wrap hidden" id="formWrap">
+    <div class="form-header">
+      <h3 id="formTitle">Add a dinner idea</h3>
+      <button id="formCloseBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label class="field-label">Dish name</label>
+        <input class="field-input" id="nameInput" placeholder="e.g. Honey garlic chicken thighs">
+      </div>
+      <div>
+        <label class="field-label">Main protein</label>
+        <div class="protein-picker" id="proteinPicker"></div>
+      </div>
+      <div>
+        <label class="field-label">Ingredients</label>
+        <div class="ingredient-rows" id="ingredientRows"></div>
+        <button type="button" class="add-ing-btn" id="addIngredientBtn">+ Add ingredient</button>
+      </div>
+      <div>
+        <label class="field-label">Spices</label>
+        <div class="spice-rows" id="spiceRows"></div>
+        <button type="button" class="add-ing-btn" id="addSpiceBtn">+ Add spice</button>
+      </div>
+      <div class="method-row">
+        <div>
+          <label class="field-label">Method</label>
+          <select class="field-input" id="methodInput">
+            <option value="">â€”</option>
+            <option value="oven">Oven</option>
+            <option value="airfryer">Air fryer</option>
+            <option value="hob">Hob</option>
+            <option value="grill">Grill</option>
+            <option value="slow-cooker">Slow cooker</option>
+            <option value="microwave">Microwave</option>
+            <option value="bbq">BBQ</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">Temperature (optional)</label>
+          <input class="field-input" id="tempInput" placeholder="200C">
+        </div>
+        <div>
+          <label class="field-label">Time (optional)</label>
+          <input class="field-input" id="timeInput" placeholder="30 min">
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Recipe steps (optional)</label>
+        <textarea class="field-textarea" id="stepsInput" rows="5" placeholder="1. Marinate the chicken&#10;2. Bake at 200C for 25 min&#10;3. Rest for 5 min before serving"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="save-btn" id="saveBtn">Add to the box</button>
+        <button class="cancel-btn" id="cancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filters" id="filterRow"></div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A9B96" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" placeholder="Search by name or ingredient">
+    </div>
+    <button class="btn-ghost" id="pickBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+      Pick for me
+    </button>
+  </div>
+
+  <div class="grid" id="cardGrid"></div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'dinner-box-ideas';
+
+  const PROTEINS = [
+    { id: 'chicken',    label: 'Chicken',          color: '#B5772E', bg: '#F3E3CB' },
+    { id: 'beef',       label: 'Beef',             color: '#8C3B2E', bg: '#EAD3CB' },
+    { id: 'pork',       label: 'Pork',             color: '#A14E63', bg: '#F0DCE1' },
+    { id: 'fish',       label: 'Fish / seafood',   color: '#2E6E8C', bg: '#D6E7EE' },
+    { id: 'vegetarian', label: 'Vegetarian',       color: '#3F7A3C', bg: '#DCE9D6' },
+    { id: 'other',      label: 'Other',            color: '#6B6357', bg: '#E7E2D6' },
+  ];
+
+  const proteinMeta = id => PROTEINS.find(p => p.id === id) || PROTEINS[5];
+
+  const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'pinch', 'whole'];
+
+  const STATES = [
+    { value: '', label: 'â€”' },
+    { value: 'raw', label: 'Raw' },
+    { value: 'cooked', label: 'Cooked' },
+  ];
+
+  const METHODS = [
+    { value: '', label: 'â€”' },
+    { value: 'oven', label: 'Oven' },
+    { value: 'airfryer', label: 'Air fryer' },
+    { value: 'hob', label: 'Hob' },
+    { value: 'grill', label: 'Grill' },
+    { value: 'slow-cooker', label: 'Slow cooker' },
+    { value: 'microwave', label: 'Microwave' },
+    { value: 'bbq', label: 'BBQ' },
+  ];
+
+  const methodLabel = id => (METHODS.find(m => m.value === id) || {}).label || '';
+
+  const seedData = [
+    {
+      id: 'seed-1',
+      name: 'Honey garlic chicken thighs',
+      protein: 'chicken',
+      ingredients: [
+        { name: 'Chicken thighs', amount: '600', unit: 'g' },
+        { name: 'Honey', amount: '2', unit: 'tbsp' },
+        { name: 'Garlic', amount: '3', unit: 'whole' },
+        { name: 'Soy sauce', amount: '2', unit: 'tbsp' },
+        { name: 'Rice', amount: '300', unit: 'g' },
+      ],
+      spices: ['Salt', 'Black pepper', 'Ground ginger'],
+      method: 'oven',
+      temp: '200C',
+      time: '35 min',
+      steps: 'Marinate the chicken thighs for 20 min.\nBake at 200C, basting halfway through.\nServe over the rice.',
+    },
+    {
+      id: 'seed-2',
+      name: 'Beef and ale stew',
+      protein: 'beef',
+      ingredients: [
+        { name: 'Diced beef', amount: '800', unit: 'g' },
+        { name: 'Ale', amount: '500', unit: 'ml' },
+        { name: 'Carrots', amount: '3', unit: 'whole' },
+        { name: 'Onion', amount: '1', unit: 'whole' },
+        { name: 'Beef stock', amount: '400', unit: 'ml' },
+        { name: 'Potatoes', amount: '4', unit: 'whole' },
+      ],
+      spices: ['Bay leaf', 'Thyme', 'Salt', 'Black pepper'],
+      method: 'slow-cooker',
+      temp: 'Low',
+      time: '2 hr',
+      steps: 'Brown the beef, then transfer to a slow cooker.\nAdd the ale, stock, carrots, onion, and potatoes.\nCook on low for 6-8 hours.',
+    },
+    {
+      id: 'seed-3',
+      name: 'Chickpea and spinach curry',
+      protein: 'vegetarian',
+      ingredients: [
+        { name: 'Chickpeas', amount: '2', unit: 'cup' },
+        { name: 'Spinach', amount: '200', unit: 'g' },
+        { name: 'Coconut milk', amount: '400', unit: 'ml' },
+        { name: 'Curry paste', amount: '2', unit: 'tbsp' },
+        { name: 'Onion', amount: '1', unit: 'whole' },
+        { name: 'Rice', amount: '300', unit: 'g' },
+      ],
+      spices: ['Cumin', 'Turmeric', 'Salt'],
+      method: 'hob',
+      temp: '',
+      time: '25 min',
+      steps: '',
+    },
+  ];
+
+  let dinners = [];
+  let activeFilters = [];
+  let searchTerm = '';
+  let editingId = null;
+  let selectedProtein = 'chicken';
+  let pickedId = null;
+
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        dinners = JSON.parse(raw);
+      } else {
+        dinners = seedData;
+        saveData();
+      }
+    } catch (e) {
+      dinners = seedData;
+    }
+  }
+
+  function saveData() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dinners));
+    } catch (e) {
+      console.error('Could not save to local storage', e);
+    }
+  }
+
+  function renderFilters() {
+    const row = document.getElementById('filterRow');
+    row.innerHTML = '';
+
+    const allChip = document.createElement('button');
+    allChip.className = 'chip' + (activeFilters.length === 0 ? ' active-all' : '');
+    allChip.textContent = 'All';
+    allChip.onclick = () => { activeFilters = []; renderAll(); };
+    row.appendChild(allChip);
+
+    PROTEINS.forEach(p => {
+      const active = activeFilters.includes(p.id);
+      const chip = document.createElement('button');
+      chip.className = 'chip';
+      chip.textContent = p.label;
+      if (active) {
+        chip.style.border = `2px solid ${p.bg}`;
+        chip.style.background = p.bg;
+        chip.style.color = p.color;
+      }
+      chip.onclick = () => {
+        activeFilters = activeFilters.includes(p.id)
+          ? activeFilters.filter(f => f !== p.id)
+          : [...activeFilters, p.id];
+        renderAll();
+      };
+      row.appendChild(chip);
+    });
+  }
+
+  function getFiltered() {
+    let list = dinners;
+    if (activeFilters.length > 0) {
+      list = list.filter(d => activeFilters.includes(d.protein));
+    }
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter(d =>
+        d.name.toLowerCase().includes(q) ||
+        d.ingredients.some(i => (typeof i === 'string' ? i : i.name).toLowerCase().includes(q)) ||
+        (d.spices || []).some(s => s.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }
+
+  function renderCards() {
+    const grid = document.getElementById('cardGrid');
+    grid.innerHTML = '';
+    const filtered = getFiltered();
+
+    if (filtered.length === 0) {
+      const msg = document.createElement('p');
+      msg.className = 'empty-msg';
+      msg.textContent = 'Nothing matches yet. Try a different filter, or add a new dinner idea.';
+      grid.appendChild(msg);
+      return;
+    }
+
+    filtered.forEach(dinner => {
+      const meta = proteinMeta(dinner.protein);
+      const card = document.createElement('div');
+      card.className = 'card' + (pickedId === dinner.id ? ' picked' : '');
+      card.id = 'dinner-' + dinner.id;
+
+      card.innerHTML = `
+        <div class="dot" style="background:${meta.color}"></div>
+        <div class="protein-label" style="color:${meta.color}">${meta.label}</div>
+        <h4>${escapeHtml(dinner.name)}</h4>
+        ${(dinner.method || dinner.temp || dinner.time) ? `
+          <div class="meta-row">
+            <span class="meta-item">${dinner.method ? escapeHtml(methodLabel(dinner.method)) : ''}</span>
+            <span class="meta-item">${dinner.temp ? escapeHtml(dinner.temp) : ''}</span>
+            <span class="meta-item">${dinner.time ? escapeHtml(dinner.time) : ''}</span>
+          </div>
+        ` : ''}
+        <div class="toggle-row">
+          <button class="toggle-ing">
+            Ingredients (${dinner.ingredients.length + (dinner.spices ? dinner.spices.length : 0)})
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          ${dinner.steps ? `
+            <button class="toggle-steps">
+              Steps
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          ` : ''}
+        </div>
+        <div class="ing-list">
+          ${dinner.ingredients.map(i => {
+            if (typeof i === 'string') return `<div>- ${escapeHtml(i)}</div>`;
+            const amt = [i.amount, i.unit].filter(Boolean).join(' ');
+            const state = i.state ? ` (${i.state})` : '';
+            return `<div>- ${escapeHtml(i.name)}${amt ? ` â€” ${escapeHtml(amt)}` : ''}${escapeHtml(state)}</div>`;
+          }).join('')}
+          ${dinner.spices && dinner.spices.length ? `
+            <div class="spice-heading">Spices</div>
+            ${dinner.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+          ` : ''}
+        </div>
+        ${dinner.steps ? `<div class="steps-list">${escapeHtml(renumberStepsText(dinner.steps))}</div>` : ''}
+        <div class="card-actions">
+          <button class="edit-btn">Edit</button>
+          <button class="del-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+            Remove
+          </button>
+        </div>
+      `;
+
+      const toggleBtn = card.querySelector('.toggle-ing');
+      const ingList = card.querySelector('.ing-list');
+      toggleBtn.onclick = () => {
+        toggleBtn.classList.toggle('open');
+        ingList.classList.toggle('open');
+      };
+
+      const toggleStepsBtn = card.querySelector('.toggle-steps');
+      const stepsList = card.querySelector('.steps-list');
+      if (toggleStepsBtn) {
+        toggleStepsBtn.onclick = () => {
+          toggleStepsBtn.classList.toggle('open');
+          stepsList.classList.toggle('open');
+        };
+      }
+
+      card.querySelector('.edit-btn').onclick = () => openForm(dinner);
+      card.querySelector('.del-btn').onclick = () => {
+        dinners = dinners.filter(d => d.id !== dinner.id);
+        if (pickedId === dinner.id) pickedId = null;
+        saveData();
+        renderAll();
+      };
+
+      grid.appendChild(card);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return String(str == null ? '' : str).replace(/"/g, '&quot;');
+  }
+
+  function renderCount() {
+    document.getElementById('countLabel').textContent =
+      `${dinners.length} idea${dinners.length !== 1 ? 's' : ''} on file`;
+  }
+
+  function renderAll() {
+    renderFilters();
+    renderCards();
+    renderCount();
+  }
+
+  function openForm(dinner) {
+    editingId = dinner ? dinner.id : null;
+    selectedProtein = dinner ? dinner.protein : 'chicken';
+    document.getElementById('formTitle').textContent = dinner ? 'Edit dinner' : 'Add a dinner idea';
+    document.getElementById('saveBtn').textContent = dinner ? 'Save changes' : 'Add to the box';
+    document.getElementById('nameInput').value = dinner ? dinner.name : '';
+    document.getElementById('methodInput').value = dinner ? (dinner.method || '') : '';
+    document.getElementById('tempInput').value = dinner ? (dinner.temp || '') : '';
+    document.getElementById('timeInput').value = dinner ? (dinner.time || '') : '';
+    document.getElementById('stepsInput').value = dinner ? renumberStepsText(dinner.steps || '') : '';
+    renderIngredientRows(dinner ? dinner.ingredients : []);
+    renderSpiceRows(dinner ? dinner.spices : []);
+    renderProteinPicker();
+    document.getElementById('formWrap').classList.remove('hidden');
+  }
+
+  function closeForm() {
+    editingId = null;
+    document.getElementById('formWrap').classList.add('hidden');
+  }
+
+  function renderProteinPicker() {
+    const wrap = document.getElementById('proteinPicker');
+    wrap.innerHTML = '';
+    PROTEINS.forEach(p => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'protein-btn' + (selectedProtein === p.id ? ' selected' : '');
+      btn.textContent = p.label;
+      if (selectedProtein === p.id) {
+        btn.style.borderColor = p.color;
+        btn.style.background = p.bg;
+        btn.style.color = p.color;
+      }
+      btn.onclick = () => { selectedProtein = p.id; renderProteinPicker(); };
+      wrap.appendChild(btn);
+    });
+  }
+
+  let ingredientRowCount = 0;
+
+  function renderIngredientRows(ingredients) {
+    const wrap = document.getElementById('ingredientRows');
+    wrap.innerHTML = '';
+    ingredientRowCount = 0;
+    if (ingredients && ingredients.length) {
+      ingredients.forEach(ing => {
+        if (typeof ing === 'string') {
+          addIngredientRow(ing, '', 'g', '');
+        } else {
+          addIngredientRow(ing.name, ing.amount, ing.unit, ing.state || '');
+        }
+      });
+    } else {
+      addIngredientRow('', '', 'g', '');
+    }
+  }
+
+  function addIngredientRow(name, amount, unit, state) {
+    const wrap = document.getElementById('ingredientRows');
+    const rowId = 'ing-row-' + (ingredientRowCount++);
+    const row = document.createElement('div');
+    row.className = 'ingredient-row';
+    row.id = rowId;
+    row.innerHTML = `
+      <input type="text" class="ing-name" placeholder="Ingredient name" value="${escapeAttr(name)}">
+      <input type="number" class="ing-amount" placeholder="Amount" min="0" step="any" value="${escapeAttr(amount)}">
+      <select class="ing-unit"></select>
+      <select class="ing-state" title="Raw or cooked (optional)"></select>
+      <button type="button" class="remove-ing-btn" title="Remove ingredient">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    `;
+    const select = row.querySelector('.ing-unit');
+    UNITS.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.textContent = u;
+      if (u === (unit || 'g')) opt.selected = true;
+      select.appendChild(opt);
+    });
+    const stateSelect = row.querySelector('.ing-state');
+    STATES.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.value;
+      opt.textContent = s.label;
+      if (s.value === (state || '')) opt.selected = true;
+      stateSelect.appendChild(opt);
+    });
+    row.querySelector('.remove-ing-btn').onclick = () => row.remove();
+    wrap.appendChild(row);
+  }
+
+  function getIngredientsFromForm() {
+    const rows = document.querySelectorAll('#ingredientRows .ingredient-row');
+    const result = [];
+    rows.forEach(row => {
+      const name = row.querySelector('.ing-name').value.trim();
+      const amount = row.querySelector('.ing-amount').value.trim();
+      const unit = row.querySelector('.ing-unit').value;
+      const state = row.querySelector('.ing-state').value;
+      if (name) result.push({ name, amount, unit, state });
+    });
+    return result;
+  }
+
+  let spiceRowCount = 0;
+
+  function renderSpiceRows(spices) {
+    const wrap = document.getElementById('spiceRows');
+    wrap.innerHTML = '';
+    spiceRowCount = 0;
+    if (spices && spices.length) {
+      spices.forEach(name => addSpiceRow(name));
+    } else {
+      addSpiceRow('');
+    }
+  }
+
+  function addSpiceRow(name) {
+    const wrap = document.getElementById('spiceRows');
+    const rowId = 'spice-row-' + (spiceRowCount++);
+    const row = document.createElement('div');
+    row.className = 'spice-row';
+    row.id = rowId;
+    row.innerHTML = `
+      <input type="text" class="spice-name" placeholder="Spice name" value="${escapeAttr(name)}">
+      <button type="button" class="remove-ing-btn" title="Remove spice">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    `;
+    row.querySelector('.remove-ing-btn').onclick = () => row.remove();
+    wrap.appendChild(row);
+  }
+
+  function getSpicesFromForm() {
+    const rows = document.querySelectorAll('#spiceRows .spice-row');
+    const result = [];
+    rows.forEach(row => {
+      const name = row.querySelector('.spice-name').value.trim();
+      if (name) result.push(name);
+    });
+    return result;
+  }
+
+  function renumberStepsText(text) {
+    if (!text) return '';
+    return text.split('\n')
+      .map(line => line.replace(/^\s*\d+\.\s?/, ''))
+      .map((content, i) => `${i + 1}. ${content}`)
+      .join('\n');
+  }
+
+  function handleStepsInput(e) {
+    const ta = e.target;
+    const cursorPos = ta.selectionStart;
+    const rawLines = ta.value.split('\n');
+
+    let pos = 0;
+    let cursorLine = 0;
+    let cursorOffsetInLine = 0;
+    for (let i = 0; i < rawLines.length; i++) {
+      const lineLen = rawLines[i].length;
+      if (cursorPos <= pos + lineLen || i === rawLines.length - 1) {
+        cursorLine = i;
+        cursorOffsetInLine = cursorPos - pos;
+        break;
+      }
+      pos += lineLen + 1;
+    }
+
+    const stripped = rawLines.map(line => line.replace(/^\s*\d+\.\s?/, ''));
+    const originalPrefixLen = rawLines[cursorLine].length - stripped[cursorLine].length;
+    const strippedCursorOffset = Math.max(0, cursorOffsetInLine - originalPrefixLen);
+
+    const newLines = stripped.map((content, i) => `${i + 1}. ${content}`);
+    const newValue = newLines.join('\n');
+
+    if (newValue === ta.value) return;
+
+    const newPrefixLen = String(cursorLine + 1).length + 2;
+    let newCursorPos = newPrefixLen + strippedCursorOffset;
+    for (let i = 0; i < cursorLine; i++) {
+      newCursorPos += newLines[i].length + 1;
+    }
+
+    ta.value = newValue;
+    ta.setSelectionRange(newCursorPos, newCursorPos);
+  }
+
+  function handleStepsFocus(e) {
+    const ta = e.target;
+    if (!ta.value) {
+      ta.value = '1. ';
+      ta.setSelectionRange(3, 3);
+    }
+  }
+
+  function handleStepsKeydown(e) {
+    if (e.key !== 'Backspace') return;
+    const ta = e.target;
+    if (ta.selectionStart !== ta.selectionEnd) return;
+    const cursorPos = ta.selectionStart;
+    const lines = ta.value.split('\n');
+
+    let pos = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const lineLen = lines[i].length;
+      const lineEnd = pos + lineLen;
+      if (cursorPos <= lineEnd || i === lines.length - 1) {
+        const offsetInLine = cursorPos - pos;
+        const match = lines[i].match(/^(\s*\d+\.\s?)/);
+        const prefixLen = match ? match[1].length : 0;
+
+        if (offsetInLine > prefixLen) return;
+
+        e.preventDefault();
+
+        if (i === 0) {
+          ta.setSelectionRange(prefixLen, prefixLen);
+          return;
+        }
+
+        const prevMatch = lines[i - 1].match(/^(\s*\d+\.\s?)/);
+        const prevPrefixLen = prevMatch ? prevMatch[1].length : 0;
+        const prevContent = lines[i - 1].slice(prevPrefixLen);
+        const mergedContent = prevContent + lines[i].slice(prefixLen);
+
+        const stripPrefix = l => l.replace(/^\s*\d+\.\s?/, '');
+        const newLines = [
+          ...lines.slice(0, i - 1).map(stripPrefix),
+          mergedContent,
+          ...lines.slice(i + 1).map(stripPrefix)
+        ];
+        const renumbered = newLines.map((content, idx) => `${idx + 1}. ${content}`);
+        ta.value = renumbered.join('\n');
+
+        let newCursorPos = 0;
+        for (let k = 0; k < i - 1; k++) newCursorPos += renumbered[k].length + 1;
+        newCursorPos += String(i).length + 2 + prevContent.length;
+        ta.setSelectionRange(newCursorPos, newCursorPos);
+        return;
+      }
+      pos = lineEnd + 1;
+    }
+  }
+
+  function handleTempBlur(e) {
+    const val = e.target.value.trim();
+    if (/^\d+(\.\d+)?$/.test(val)) {
+      e.target.value = val + 'C';
+    }
+  }
+
+  function handleSave() {
+    const name = document.getElementById('nameInput').value.trim();
+    if (!name) return;
+    const ingredients = getIngredientsFromForm();
+    const spices = getSpicesFromForm();
+    const method = document.getElementById('methodInput').value;
+    const temp = document.getElementById('tempInput').value.trim();
+    const time = document.getElementById('timeInput').value.trim();
+    const steps = document.getElementById('stepsInput').value.trim();
+
+    if (editingId) {
+      dinners = dinners.map(d => d.id === editingId
+        ? { ...d, name, protein: selectedProtein, ingredients, spices, method, temp, time, steps }
+        : d);
+    } else {
+      dinners = [{ id: 'dinner-' + Date.now(), name, protein: selectedProtein, ingredients, spices, method, temp, time, steps }, ...dinners];
+    }
+    saveData();
+    closeForm();
+    renderAll();
+  }
+
+  function handlePickForMe() {
+    const filtered = getFiltered();
+    if (filtered.length === 0) return;
+    const choice = filtered[Math.floor(Math.random() * filtered.length)];
+    pickedId = choice.id;
+    renderCards();
+    setTimeout(() => {
+      const el = document.getElementById('dinner-' + choice.id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  }
+
+  document.getElementById('addBtn').onclick = () => openForm(null);
+  document.getElementById('formCloseBtn').onclick = closeForm;
+  document.getElementById('cancelBtn').onclick = closeForm;
+  document.getElementById('saveBtn').onclick = handleSave;
+  document.getElementById('searchInput').oninput = (e) => { searchTerm = e.target.value; renderCards(); };
+  document.getElementById('pickBtn').onclick = handlePickForMe;
+  document.getElementById('addIngredientBtn').onclick = () => addIngredientRow('', '', 'g', '');
+  document.getElementById('addSpiceBtn').onclick = () => addSpiceRow('');
+  document.getElementById('stepsInput').addEventListener('keydown', handleStepsKeydown);
+  document.getElementById('stepsInput').addEventListener('input', handleStepsInput);
+  document.getElementById('stepsInput').addEventListener('focus', handleStepsFocus);
+  document.getElementById('tempInput').addEventListener('blur', handleTempBlur);
+
+  loadData();
+  renderAll();
+</script>
+
+</body>
+</html>
