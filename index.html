@@ -147,12 +147,15 @@
         const data = await res.json();
         const food = data.foods && data.foods[0];
         if (food) {
-          const getNutrient = (number) => {
-            const n = (food.foodNutrients || []).find(fn => String(fn.nutrientNumber) === number);
-            return n ? (n.value || 0) : 0;
+          const getNutrient = (...numbers) => {
+            for (const number of numbers) {
+              const n = (food.foodNutrients || []).find(fn => String(fn.nutrientNumber) === number);
+              if (n) return n.value || 0;
+            }
+            return 0;
           };
           result = {
-            calories: getNutrient('208'),
+            calories: getNutrient('208', '957', '958'),
             protein: getNutrient('203'),
             carbs: getNutrient('205'),
             fat: getNutrient('204'),
