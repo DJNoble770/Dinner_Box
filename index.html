@@ -96,7 +96,24 @@
   <div class="grid" id="cardGrid"></div>
 </div>
 
-<script>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyADDooNjHzYrOHLigjXSVypWgGrZzW4VR8",
+    authDomain: "dinner-box-f8c64.firebaseapp.com",
+    projectId: "dinner-box-f8c64",
+    storageBucket: "dinner-box-f8c64.firebasestorage.app",
+    messagingSenderId: "285616906292",
+    appId: "1:285616906292:web:4d4b5b47afd19546e0aa61"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
   const STORAGE_KEY = 'dinner-box-ideas';
 
   const PROTEINS = [
@@ -194,25 +211,27 @@
   let selectedProtein = 'chicken';
   let pickedId = null;
 
-  function loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        dinners = JSON.parse(raw);
+  function startSync() {
+    onSnapshot(dinnerDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        dinners = snapshot.data().dinners || [];
       } else {
         dinners = seedData;
         saveData();
       }
-    } catch (e) {
+      renderAll();
+    }, (error) => {
+      console.error('Sync error, showing local view only', error);
       dinners = seedData;
-    }
+      renderAll();
+    });
   }
 
-  function saveData() {
+  async function saveData() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(dinners));
+      await setDoc(dinnerDocRef, { dinners }, { merge: true });
     } catch (e) {
-      console.error('Could not save to local storage', e);
+      console.error('Could not save to the shared database', e);
     }
   }
 
@@ -676,8 +695,7 @@
   document.getElementById('stepsInput').addEventListener('focus', handleStepsFocus);
   document.getElementById('tempInput').addEventListener('blur', handleTempBlur);
 
-  loadData();
-  renderAll();
+  startSync();
 </script>
 
 </body>
