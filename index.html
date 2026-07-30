@@ -1,7 +1,4 @@
-﻿
-
-<!DOCTYPE html>
-
+﻿<!DOCTYPE html>
 <html lang="en-GB">
 <head>
 <meta charset="UTF-8">
@@ -53,7 +50,7 @@
         <div>
           <label class="field-label">Method</label>
           <select class="field-input" id="methodInput">
-            <option value="">â€”</option>
+            <option value="">—</option>
             <option value="oven">Oven</option>
             <option value="airfryer">Air fryer</option>
             <option value="hob">Hob</option>
@@ -133,13 +130,13 @@
   const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'pinch', 'whole'];
 
   const STATES = [
-    { value: '', label: 'â€”' },
+    { value: '', label: '—' },
     { value: 'raw', label: 'Raw' },
     { value: 'cooked', label: 'Cooked' },
   ];
 
   const METHODS = [
-    { value: '', label: 'â€”' },
+    { value: '', label: '—' },
     { value: 'oven', label: 'Oven' },
     { value: 'airfryer', label: 'Air fryer' },
     { value: 'hob', label: 'Hob' },
@@ -331,7 +328,7 @@
             if (typeof i === 'string') return `<div>- ${escapeHtml(i)}</div>`;
             const amt = [i.amount, i.unit].filter(Boolean).join(' ');
             const state = i.state ? ` (${i.state})` : '';
-            return `<div>- ${escapeHtml(i.name)}${amt ? ` â€” ${escapeHtml(amt)}` : ''}${escapeHtml(state)}</div>`;
+            return `<div>- ${escapeHtml(i.name)}${amt ? ` — ${escapeHtml(amt)}` : ''}${escapeHtml(state)}</div>`;
           }).join('')}
           ${dinner.spices && dinner.spices.length ? `
             <div class="spice-heading">Spices</div>
@@ -610,7 +607,6 @@
         const offsetInLine = cursorPos - pos;
         const match = lines[i].match(/^(\s*\d+\.\s?)/);
         const prefixLen = match ? match[1].length : 0;
-
         if (offsetInLine > prefixLen) return;
 
         e.preventDefault();
