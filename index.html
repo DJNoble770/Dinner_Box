@@ -129,6 +129,75 @@
 
   const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'pinch', 'whole'];
 
+  const FDC_API_KEY = 'Nx3We7Na5FftKtPxrorL6upc9VBHVHQrJHuq39ZQ';
+  const UNIT_TO_GRAMS = { g: 1, kg: 1000, ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 240, oz: 28.3495, lb: 453.592 };
+  const macroLookupCache = new Map();
+
+  async function fetchMacrosPer100g(name, state) {
+    const cacheKey = `${name.trim().toLowerCase()}|${state || ''}`;
+    if (macroLookupCache.has(cacheKey)) return macroLookupCache.get(cacheKey);
+
+    const query = state ? `${name}, ${state}` : name;
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${FDC_API_KEY}&query=${encodeURIComponent(query)}&pageSize=5&dataType=Foundation,SR%20Legacy`;
+
+    let result = null;
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const food = data.foods && data.foods[0];
+        if (food) {
+          const getNutrient = (number) => {
+            const n = (food.foodNutrients || []).find(fn => String(fn.nutrientNumber) === number);
+            return n ? (n.value || 0) : 0;
+          };
+          result = {
+            calories: getNutrient('208'),
+            protein: getNutrient('203'),
+            carbs: getNutrient('205'),
+            fat: getNutrient('204'),
+            matchedName: food.description,
+          };
+        }
+      }
+    } catch (e) {
+      console.error('Macro lookup failed', e);
+    }
+
+    macroLookupCache.set(cacheKey, result);
+    return result;
+  }
+
+  function scaleMacros(per100g, amount, unit) {
+    const gramsPerUnit = UNIT_TO_GRAMS[unit];
+    const qty = parseFloat(amount);
+    if (!per100g || !gramsPerUnit || !qty) return null;
+    const grams = qty * gramsPerUnit;
+    const scale = grams / 100;
+    return {
+      calories: Math.round(per100g.calories * scale),
+      protein: Math.round(per100g.protein * scale * 10) / 10,
+      carbs: Math.round(per100g.carbs * scale * 10) / 10,
+      fat: Math.round(per100g.fat * scale * 10) / 10,
+      matchedName: per100g.matchedName,
+    };
+  }
+
+  function dinnerMacroTotals(dinner) {
+    const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    let hasAny = false;
+    (dinner.ingredients || []).forEach(i => {
+      if (i && i.macros) {
+        hasAny = true;
+        totals.calories += i.macros.calories || 0;
+        totals.protein += i.macros.protein || 0;
+        totals.carbs += i.macros.carbs || 0;
+        totals.fat += i.macros.fat || 0;
+      }
+    });
+    return hasAny ? totals : null;
+  }
+
   const STATES = [
     { value: '', label: '—' },
     { value: 'raw', label: 'Raw' },
@@ -296,6 +365,7 @@
 
     filtered.forEach(dinner => {
       const meta = proteinMeta(dinner.protein);
+      const macroTotals = dinnerMacroTotals(dinner);
       const card = document.createElement('div');
       card.className = 'card' + (pickedId === dinner.id ? ' picked' : '');
       card.id = 'dinner-' + dinner.id;
@@ -310,6 +380,9 @@
             <span class="meta-item">${dinner.temp ? escapeHtml(dinner.temp) : ''}</span>
             <span class="meta-item">${dinner.time ? escapeHtml(dinner.time) : ''}</span>
           </div>
+        ` : ''}
+        ${macroTotals ? `
+          <div class="macro-row">${macroTotals.calories} kcal · ${Math.round(macroTotals.protein)}g protein · ${Math.round(macroTotals.carbs)}g carbs · ${Math.round(macroTotals.fat)}g fat</div>
         ` : ''}
         <div class="toggle-row">
           <button class="toggle-ing">
@@ -444,7 +517,7 @@
         if (typeof ing === 'string') {
           addIngredientRow(ing, '', 'g', '');
         } else {
-          addIngredientRow(ing.name, ing.amount, ing.unit, ing.state || '');
+          addIngredientRow(ing.name, ing.amount, ing.unit, ing.state || '', ing.macros || null);
         }
       });
     } else {
@@ -452,9 +525,11 @@
     }
   }
 
-  function addIngredientRow(name, amount, unit, state) {
+  function addIngredientRow(name, amount, unit, state, macros) {
     const wrap = document.getElementById('ingredientRows');
     const rowId = 'ing-row-' + (ingredientRowCount++);
+    const item = document.createElement('div');
+    item.className = 'ingredient-item';
     const row = document.createElement('div');
     row.className = 'ingredient-row';
     row.id = rowId;
@@ -483,8 +558,60 @@
       if (s.value === (state || '')) opt.selected = true;
       stateSelect.appendChild(opt);
     });
-    row.querySelector('.remove-ing-btn').onclick = () => row.remove();
-    wrap.appendChild(row);
+    const note = document.createElement('div');
+    note.className = 'ing-macro-note';
+    row.dataset.macros = macros ? JSON.stringify(macros) : '';
+    if (macros) note.textContent = macroNoteText(macros);
+
+    row.querySelector('.remove-ing-btn').onclick = () => item.remove();
+    item.appendChild(row);
+    item.appendChild(note);
+    wrap.appendChild(item);
+
+    const trigger = () => updateRowMacros(row);
+    row.querySelector('.ing-name').addEventListener('blur', trigger);
+    row.querySelector('.ing-amount').addEventListener('blur', trigger);
+    row.querySelector('.ing-unit').addEventListener('change', trigger);
+    row.querySelector('.ing-state').addEventListener('change', trigger);
+  }
+
+  function macroNoteText(macros) {
+    return `≈ ${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat`;
+  }
+
+  async function updateRowMacros(row) {
+    const name = row.querySelector('.ing-name').value.trim();
+    const amount = row.querySelector('.ing-amount').value.trim();
+    const unit = row.querySelector('.ing-unit').value;
+    const state = row.querySelector('.ing-state').value;
+    const note = row.nextElementSibling;
+
+    if (!name || !amount) {
+      row.dataset.macros = '';
+      if (note) note.textContent = '';
+      return;
+    }
+    if (!UNIT_TO_GRAMS[unit]) {
+      row.dataset.macros = '';
+      if (note) note.textContent = 'Use a weight or volume unit to estimate macros';
+      return;
+    }
+
+    const token = Symbol();
+    row._macroToken = token;
+    if (note) note.textContent = 'Calculating macros…';
+
+    const per100g = await fetchMacrosPer100g(name, state);
+    if (row._macroToken !== token) return;
+
+    const macros = scaleMacros(per100g, amount, unit);
+    if (!macros) {
+      row.dataset.macros = '';
+      if (note) note.textContent = `No macro data found for "${name}"`;
+      return;
+    }
+    row.dataset.macros = JSON.stringify(macros);
+    if (note) note.textContent = macroNoteText(macros);
   }
 
   function getIngredientsFromForm() {
@@ -495,7 +622,8 @@
       const amount = row.querySelector('.ing-amount').value.trim();
       const unit = row.querySelector('.ing-unit').value;
       const state = row.querySelector('.ing-state').value;
-      if (name) result.push({ name, amount, unit, state });
+      const macros = row.dataset.macros ? JSON.parse(row.dataset.macros) : null;
+      if (name) result.push({ name, amount, unit, state, macros });
     });
     return result;
   }

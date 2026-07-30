@@ -330,11 +330,28 @@ label.field-label {
   flex-direction: column;
   gap: 8px;
 }
+.ingredient-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
 .ingredient-row {
   display: grid;
   grid-template-columns: 1fr 90px 90px 90px 28px;
   gap: 8px;
   align-items: center;
+}
+.ing-macro-note {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  padding-left: 2px;
+  min-height: 14px;
+}
+.macro-row {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
 }
 .ingredient-row input[type="text"],
 .ingredient-row input[type="number"] {
