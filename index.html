@@ -162,26 +162,30 @@
     return a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4))));
   }
 
-  const MACRO_OFFCUT_PARTS = ['skin', 'bone', 'fat', 'giblets', 'liver', 'gizzard', 'heart', 'tripe'];
-
   function pickBestFood(query, foods) {
     const queryTokens = tokenize(query);
     let best = null;
-    let bestScore = -Infinity;
+    let bestKey = Infinity;
     foods.forEach(food => {
       const descTokens = tokenize(food.description);
-      const matchedQuery = queryTokens.filter(qt => descTokens.some(dt => tokensOverlap(qt, dt))).length;
-      const matchedDesc = descTokens.filter(dt => queryTokens.some(qt => tokensOverlap(qt, dt))).length;
-      const extra = descTokens.length - matchedDesc;
-      let score = matchedQuery * 3 - extra;
-      const hasUnaskedOffCut = MACRO_OFFCUT_PARTS.some(p => descTokens.includes(p) && !queryTokens.includes(p));
-      if (hasUnaskedOffCut) score -= 50;
-      if (score > bestScore) {
-        bestScore = score;
+      let positionSum = 0;
+      let matchedCount = 0;
+      queryTokens.forEach(qt => {
+        const idx = descTokens.findIndex(dt => tokensOverlap(qt, dt));
+        if (idx === -1) {
+          positionSum += descTokens.length + 5;
+        } else {
+          positionSum += idx;
+          matchedCount++;
+        }
+      });
+      if (matchedCount === 0) return;
+      if (positionSum < bestKey) {
+        bestKey = positionSum;
         best = food;
       }
     });
-    return best;
+    return best || foods[0];
   }
 
   async function fetchMacrosPer100g(name, state) {
