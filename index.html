@@ -414,14 +414,16 @@
     });
   }
 
-  async function saveData() {
-    if (!dinnerDocRef) return;
-    try {
-      await setDoc(dinnerDocRef, { dinners }, { merge: true });
-    } catch (e) {
+  let pendingSave = Promise.resolve();
+
+  function saveData() {
+    if (!dinnerDocRef) return Promise.resolve();
+    const p = setDoc(dinnerDocRef, { dinners }, { merge: true }).catch(e => {
       console.error('Could not save to the database', e);
       alert('Could not save your changes to the database — they may be lost on reload. ' + (e.message || ''));
-    }
+    });
+    pendingSave = p;
+    return p;
   }
 
   function renderFilters() {
@@ -1060,6 +1062,7 @@
 
   async function doSignOut() {
     try {
+      await pendingSave;
       await signOut(auth);
     } catch (e) {
       console.error('Sign out failed', e);
@@ -1116,7 +1119,13 @@
 
     // Force-refresh the ID token so Firestore rules see an up-to-date email_verified claim
     // (the token can otherwise stay stale right after verifying, in the same session).
-    await user.getIdToken(true);
+    try {
+      await user.getIdToken(true);
+    } catch (e) {
+      console.error('Session is no longer valid, signing out', e);
+      await signOut(auth).catch(() => {});
+      return;
+    }
 
     document.getElementById('userEmailLabel').textContent = user.email;
     clearAuthError();
