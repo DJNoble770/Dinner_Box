@@ -39,7 +39,10 @@
       <div>
         <label class="field-label">Ingredients</label>
         <div class="ingredient-rows" id="ingredientRows"></div>
-        <button type="button" class="add-ing-btn" id="addIngredientBtn">+ Add ingredient</button>
+        <div class="ing-btn-row">
+          <button type="button" class="add-ing-btn" id="addIngredientBtn">+ Add ingredient</button>
+          <button type="button" class="add-ing-btn" id="macrosBtn">Edit macros</button>
+        </div>
       </div>
       <div>
         <label class="field-label">Spices</label>
@@ -94,6 +97,22 @@
   </div>
 
   <div class="grid" id="cardGrid"></div>
+</div>
+
+<div class="modal-overlay hidden" id="macrosModal">
+  <div class="modal-panel">
+    <div class="form-header">
+      <h3>Edit macros</h3>
+      <button id="macrosModalCloseBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="macros-modal-list" id="macrosModalList"></div>
+    <div class="form-actions">
+      <button class="save-btn" id="macrosModalSaveBtn">Save macros</button>
+      <button class="cancel-btn" id="macrosModalCancelBtn">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -521,6 +540,7 @@
   function closeForm() {
     editingId = null;
     document.getElementById('formWrap').classList.add('hidden');
+    document.getElementById('macrosModal').classList.add('hidden');
   }
 
   function renderProteinPicker() {
@@ -611,10 +631,14 @@
   }
 
   function macroNoteText(macros) {
-    return `≈ ${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat`;
+    const suffix = macros.manual ? ' (manual)' : '';
+    return `≈ ${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat${suffix}`;
   }
 
   async function updateRowMacros(row) {
+    const existing = row.dataset.macros ? JSON.parse(row.dataset.macros) : null;
+    if (existing && existing.manual) return;
+
     const name = row.querySelector('.ing-name').value.trim();
     const amount = row.querySelector('.ing-amount').value.trim();
     const unit = row.querySelector('.ing-unit').value;
@@ -832,6 +856,70 @@
     renderAll();
   }
 
+  function openMacrosModal() {
+    const list = document.getElementById('macrosModalList');
+    list.innerHTML = '';
+    const rows = document.querySelectorAll('#ingredientRows .ingredient-row');
+
+    rows.forEach(row => {
+      const name = row.querySelector('.ing-name').value.trim();
+      if (!name) return;
+      const macros = row.dataset.macros ? JSON.parse(row.dataset.macros) : null;
+
+      const entry = document.createElement('div');
+      entry.className = 'macro-modal-row';
+      entry.innerHTML = `
+        <div class="macro-modal-info">
+          <div class="macro-modal-name">${escapeHtml(name)}</div>
+          <div class="macro-modal-current">${macros ? macroNoteText(macros) : 'No estimate yet'}</div>
+        </div>
+        <div class="macro-modal-inputs">
+          <div><label>Kcal</label><input type="number" class="macro-in-kcal" min="0" step="any" value="${macros ? escapeAttr(macros.calories) : ''}"></div>
+          <div><label>Protein</label><input type="number" class="macro-in-protein" min="0" step="any" value="${macros ? escapeAttr(macros.protein) : ''}"></div>
+          <div><label>Carbs</label><input type="number" class="macro-in-carbs" min="0" step="any" value="${macros ? escapeAttr(macros.carbs) : ''}"></div>
+          <div><label>Fat</label><input type="number" class="macro-in-fat" min="0" step="any" value="${macros ? escapeAttr(macros.fat) : ''}"></div>
+        </div>
+      `;
+      entry._targetRow = row;
+      list.appendChild(entry);
+    });
+
+    document.getElementById('macrosModal').classList.remove('hidden');
+  }
+
+  function closeMacrosModal() {
+    document.getElementById('macrosModal').classList.add('hidden');
+  }
+
+  function saveMacrosModal() {
+    const entries = document.querySelectorAll('#macrosModalList .macro-modal-row');
+    entries.forEach(entry => {
+      const row = entry._targetRow;
+      const kcal = entry.querySelector('.macro-in-kcal').value.trim();
+      const protein = entry.querySelector('.macro-in-protein').value.trim();
+      const carbs = entry.querySelector('.macro-in-carbs').value.trim();
+      const fat = entry.querySelector('.macro-in-fat').value.trim();
+      const note = row.nextElementSibling;
+
+      if (!kcal && !protein && !carbs && !fat) {
+        row.dataset.macros = '';
+        if (note) note.textContent = '';
+        return;
+      }
+
+      const macros = {
+        calories: Math.round(parseFloat(kcal) || 0),
+        protein: parseFloat(protein) || 0,
+        carbs: parseFloat(carbs) || 0,
+        fat: parseFloat(fat) || 0,
+        manual: true,
+      };
+      row.dataset.macros = JSON.stringify(macros);
+      if (note) note.textContent = macroNoteText(macros);
+    });
+    closeMacrosModal();
+  }
+
   function handlePickForMe() {
     const filtered = getFiltered();
     if (filtered.length === 0) return;
@@ -852,6 +940,10 @@
   document.getElementById('pickBtn').onclick = handlePickForMe;
   document.getElementById('addIngredientBtn').onclick = () => addIngredientRow('', '', 'g', '');
   document.getElementById('addSpiceBtn').onclick = () => addSpiceRow('');
+  document.getElementById('macrosBtn').onclick = openMacrosModal;
+  document.getElementById('macrosModalCloseBtn').onclick = closeMacrosModal;
+  document.getElementById('macrosModalCancelBtn').onclick = closeMacrosModal;
+  document.getElementById('macrosModalSaveBtn').onclick = saveMacrosModal;
   document.getElementById('stepsInput').addEventListener('keydown', handleStepsKeydown);
   document.getElementById('stepsInput').addEventListener('input', handleStepsInput);
   document.getElementById('stepsInput').addEventListener('focus', handleStepsFocus);
