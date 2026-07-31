@@ -43,7 +43,7 @@
       <p class="subtitle" id="countLabel">0 ideas on file</p>
     </div>
     <div class="header-actions">
-      <button class="user-email-btn" id="userEmailLabel"></button>
+      <button class="user-email-btn" id="userEmailLabel"><span id="userEmailText"></span></button>
       <button class="btn-ghost" id="signOutBtn">Sign out</button>
       <button class="btn-primary" id="addBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -152,6 +152,10 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
+    <div class="friends-section-heading" id="pendingSharesHeading">Shared with you</div>
+    <div class="pending-shares-list" id="pendingSharesList"></div>
+
+    <div class="friends-section-heading">Your friends</div>
     <div class="friend-add-row">
       <input class="field-input" id="friendEmailInput" type="email" placeholder="Friend's email">
       <button class="save-btn" id="addFriendBtn">Add</button>
@@ -187,6 +191,7 @@
   let friends = [];
   let currentUser = null;
   let openShareDinnerId = null;
+  let pendingShares = [];
 
   const PROTEINS = [
     { id: 'chicken', label: 'Chicken',        color: '#B5772E', bg: '#F3E3CB' },
@@ -438,19 +443,44 @@
     });
 
     stopSharedSync = onSnapshot(collection(db, "dinnerBox", uid, "shared"), (snapshot) => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type !== 'added') return;
-        const shared = change.doc.data();
-        if (shared && shared.dinner) {
-          dinners = [{ ...shared.dinner, id: 'dinner-' + Date.now() + '-' + Math.floor(Math.random() * 1000) }, ...dinners];
-          saveData();
-          renderAll();
-        }
-        deleteDoc(change.doc.ref).catch(e => console.error('Could not clear shared item', e));
-      });
+      pendingShares = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      updatePendingBadge();
+      if (!document.getElementById('friendsModal').classList.contains('hidden')) {
+        renderPendingShares();
+      }
     }, (error) => {
       console.error('Shared inbox sync error', error);
     });
+  }
+
+  function updatePendingBadge() {
+    const btn = document.getElementById('userEmailLabel');
+    btn.classList.toggle('has-pending', pendingShares.length > 0);
+    const existingBadge = btn.querySelector('.pending-badge');
+    if (existingBadge) existingBadge.remove();
+    if (pendingShares.length > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'pending-badge';
+      badge.textContent = pendingShares.length;
+      btn.appendChild(badge);
+    }
+  }
+
+  async function acceptShare(share) {
+    const newDinner = {
+      ...share.dinner,
+      id: 'dinner-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      receivedFromUid: share.fromUid,
+      sharedToUids: [],
+    };
+    dinners = [newDinner, ...dinners];
+    await saveData();
+    await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'shared', share.id)).catch(e => console.error('Could not clear shared item', e));
+    renderAll();
+  }
+
+  async function declineShare(share) {
+    await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'shared', share.id)).catch(e => console.error('Could not clear shared item', e));
   }
 
   let pendingSave = Promise.resolve();
@@ -465,13 +495,25 @@
     return p;
   }
 
+  function canShareDinnerWithFriend(dinner, friend) {
+    if (dinner.receivedFromUid === friend.uid) return false;
+    if ((dinner.sharedToUids || []).includes(friend.uid)) return false;
+    return true;
+  }
+
   async function shareDinnerWithFriend(dinner, friend) {
+    if (!canShareDinnerWithFriend(dinner, friend)) return;
     try {
-      const { id, ...dinnerWithoutId } = dinner;
+      const { id, sharedToUids, receivedFromUid, ...dinnerWithoutMeta } = dinner;
       await addDoc(collection(db, 'dinnerBox', friend.uid, 'shared'), {
-        dinner: dinnerWithoutId,
+        dinner: dinnerWithoutMeta,
         fromEmail: currentUser ? currentUser.email : '',
+        fromUid: currentUser ? currentUser.uid : '',
       });
+      dinners = dinners.map(d => d.id === dinner.id
+        ? { ...d, sharedToUids: [...(d.sharedToUids || []), friend.uid] }
+        : d);
+      await saveData();
       openShareDinnerId = null;
       renderCards();
     } catch (e) {
@@ -658,11 +700,18 @@
         } else {
           friends.forEach(f => {
             const btn = document.createElement('button');
-            btn.textContent = f.email;
-            btn.onclick = (e) => {
-              e.stopPropagation();
-              shareDinnerWithFriend(dinner, f);
-            };
+            const allowed = canShareDinnerWithFriend(dinner, f);
+            if (!allowed) {
+              btn.disabled = true;
+              btn.title = dinner.receivedFromUid === f.uid ? "Can't share back to who sent it to you" : 'Already shared with them';
+              btn.textContent = `${f.email} ✓`;
+            } else {
+              btn.textContent = f.email;
+              btn.onclick = (e) => {
+                e.stopPropagation();
+                shareDinnerWithFriend(dinner, f);
+              };
+            }
             sharePopover.appendChild(btn);
           });
         }
@@ -1014,7 +1063,40 @@
     document.getElementById('friendEmailInput').value = '';
     document.getElementById('friendError').classList.add('hidden');
     renderFriendsList();
+    renderPendingShares();
     document.getElementById('friendsModal').classList.remove('hidden');
+  }
+
+  function renderPendingShares() {
+    const heading = document.getElementById('pendingSharesHeading');
+    const list = document.getElementById('pendingSharesList');
+    list.innerHTML = '';
+
+    if (pendingShares.length === 0) {
+      heading.classList.add('hidden');
+      list.classList.add('hidden');
+      return;
+    }
+    heading.classList.remove('hidden');
+    list.classList.remove('hidden');
+
+    pendingShares.forEach(share => {
+      const row = document.createElement('div');
+      row.className = 'pending-share-row';
+      row.innerHTML = `
+        <div class="pending-share-info">
+          <span class="pending-share-name">${escapeHtml(share.dinner ? share.dinner.name : 'Unknown dish')}</span>
+          <span class="pending-share-from">from ${escapeHtml(share.fromEmail || 'a friend')}</span>
+        </div>
+        <div class="pending-share-actions">
+          <button class="accept-share-btn">Accept</button>
+          <button class="decline-share-btn">Decline</button>
+        </div>
+      `;
+      row.querySelector('.accept-share-btn').onclick = () => acceptShare(share);
+      row.querySelector('.decline-share-btn').onclick = () => declineShare(share);
+      list.appendChild(row);
+    });
   }
 
   function closeFriendsModal() {
@@ -1304,6 +1386,8 @@
       dinnerDocRef = null;
       dinners = [];
       friends = [];
+      pendingShares = [];
+      updatePendingBadge();
       editingId = null;
       document.getElementById('formWrap').classList.add('hidden');
       document.getElementById('friendsModal').classList.add('hidden');
@@ -1334,7 +1418,7 @@
     setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase() }, { merge: true })
       .catch(e => console.error('Could not update user directory entry', e));
 
-    document.getElementById('userEmailLabel').textContent = user.email;
+    document.getElementById('userEmailText').textContent = user.email;
     clearAuthError();
     showScreen('appContent');
     startSync(user.uid);

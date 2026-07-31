@@ -351,10 +351,73 @@ button {
   color: var(--ink);
 }
 .share-popover button:hover { background: #F0E6C8; }
+.share-popover button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.share-popover button:disabled:hover { background: none; }
 .share-popover .share-empty {
   font-size: 12px;
   color: var(--muted);
   padding: 6px 8px;
+}
+
+.user-email-btn.has-pending {
+  color: #E8A5A5;
+  text-decoration-color: #E8A5A5;
+}
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #C24444;
+  color: #FFF3F3;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pending-shares-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.pending-share-row {
+  border: 1px solid #E5D9B8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.pending-share-info { display: flex; flex-direction: column; }
+.pending-share-name { font-weight: 600; color: var(--ink); }
+.pending-share-from { font-size: 11px; color: var(--muted); }
+.pending-share-actions { display: flex; gap: 6px; }
+.pending-share-actions button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+}
+.accept-share-btn { background: var(--accent); color: #FFFDF8; }
+.decline-share-btn { background: none; border: 1px solid #C9B98F !important; color: var(--muted); }
+
+.friends-section-heading {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin: 4px 0 8px;
 }
 
 .form-wrap {
