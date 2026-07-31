@@ -59,9 +59,14 @@ h1 {
   flex-wrap: wrap;
 }
 
-.user-email {
+.user-email-btn {
   color: var(--panel-muted);
   font-size: 13px;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
 }
 
 .app-content.hidden { display: none; }
@@ -312,6 +317,46 @@ button {
 .card-actions .edit-btn { color: var(--muted); }
 .card-actions .del-btn { color: #A14E4E; }
 
+.share-wrap {
+  position: relative;
+  margin-left: auto;
+}
+.share-btn {
+  color: var(--accent);
+}
+.share-popover {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 6px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  padding: 6px;
+  min-width: 150px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.share-popover.hidden { display: none; }
+.share-popover button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.share-popover button:hover { background: #F0E6C8; }
+.share-popover .share-empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 8px;
+}
+
 .form-wrap {
   background: var(--card);
   border: 2px dashed #C9B98F;
@@ -431,6 +476,41 @@ label.field-label {
   flex-direction: column;
   gap: 14px;
   margin-bottom: 16px;
+}
+
+.friend-add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.friend-add-row input { flex: 1; }
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.friend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #E5D9B8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.friend-row .remove-friend-btn {
+  background: none;
+  border: none;
+  color: #A14E4E;
+  font-size: 12px;
+  padding: 0;
+}
+.friends-empty {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .macro-modal-row {

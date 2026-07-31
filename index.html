@@ -43,7 +43,7 @@
       <p class="subtitle" id="countLabel">0 ideas on file</p>
     </div>
     <div class="header-actions">
-      <span class="user-email" id="userEmailLabel"></span>
+      <button class="user-email-btn" id="userEmailLabel"></button>
       <button class="btn-ghost" id="signOutBtn">Sign out</button>
       <button class="btn-primary" id="addBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -144,10 +144,27 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="friendsModal">
+  <div class="modal-panel">
+    <div class="form-header">
+      <h3>Friends</h3>
+      <button id="friendsModalCloseBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="friend-add-row">
+      <input class="field-input" id="friendEmailInput" type="email" placeholder="Friend's email">
+      <button class="save-btn" id="addFriendBtn">Add</button>
+    </div>
+    <p class="auth-error hidden" id="friendError"></p>
+    <div class="friends-list" id="friendsList"></div>
+  </div>
+</div>
+
 <script type="module">
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
   // Your web app's Firebase configuration
@@ -166,6 +183,10 @@
   const auth = getAuth(app);
   let dinnerDocRef = null;
   let stopSync = null;
+  let stopSharedSync = null;
+  let friends = [];
+  let currentUser = null;
+  let openShareDinnerId = null;
 
   const PROTEINS = [
     { id: 'chicken', label: 'Chicken',        color: '#B5772E', bg: '#F3E3CB' },
@@ -402,15 +423,33 @@
     stopSync = onSnapshot(dinnerDocRef, (snapshot) => {
       if (snapshot.exists()) {
         dinners = snapshot.data().dinners || [];
+        friends = snapshot.data().friends || [];
       } else {
         dinners = seedData;
+        friends = [];
         saveData();
       }
       renderAll();
     }, (error) => {
       console.error('Sync error, showing local view only', error);
       dinners = seedData;
+      friends = [];
       renderAll();
+    });
+
+    stopSharedSync = onSnapshot(collection(db, "dinnerBox", uid, "shared"), (snapshot) => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type !== 'added') return;
+        const shared = change.doc.data();
+        if (shared && shared.dinner) {
+          dinners = [{ ...shared.dinner, id: 'dinner-' + Date.now() + '-' + Math.floor(Math.random() * 1000) }, ...dinners];
+          saveData();
+          renderAll();
+        }
+        deleteDoc(change.doc.ref).catch(e => console.error('Could not clear shared item', e));
+      });
+    }, (error) => {
+      console.error('Shared inbox sync error', error);
     });
   }
 
@@ -424,6 +463,36 @@
     });
     pendingSave = p;
     return p;
+  }
+
+  async function shareDinnerWithFriend(dinner, friend) {
+    try {
+      const { id, ...dinnerWithoutId } = dinner;
+      await addDoc(collection(db, 'dinnerBox', friend.uid, 'shared'), {
+        dinner: dinnerWithoutId,
+        fromEmail: currentUser ? currentUser.email : '',
+      });
+      openShareDinnerId = null;
+      renderCards();
+    } catch (e) {
+      console.error('Could not share dinner', e);
+      alert('Could not share this dinner. ' + (e.message || ''));
+    }
+  }
+
+  document.addEventListener('click', () => {
+    if (openShareDinnerId !== null) {
+      openShareDinnerId = null;
+      renderCards();
+    }
+  });
+
+  function saveFriends() {
+    if (!dinnerDocRef) return Promise.resolve();
+    return setDoc(dinnerDocRef, { friends }, { merge: true }).catch(e => {
+      console.error('Could not save friends list', e);
+      alert('Could not save your friends list. ' + (e.message || ''));
+    });
   }
 
   function renderFilters() {
@@ -537,6 +606,12 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
             Remove
           </button>
+          <div class="share-wrap">
+            <button class="share-btn" title="Share with a friend">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+            </button>
+            <div class="share-popover hidden"></div>
+          </div>
         </div>
       `;
 
@@ -563,6 +638,35 @@
         saveData();
         renderAll();
       };
+
+      const shareBtn = card.querySelector('.share-btn');
+      const sharePopover = card.querySelector('.share-popover');
+      shareBtn.onclick = (e) => {
+        e.stopPropagation();
+        const willOpen = openShareDinnerId !== dinner.id;
+        openShareDinnerId = willOpen ? dinner.id : null;
+        renderCards();
+      };
+      if (openShareDinnerId === dinner.id) {
+        sharePopover.classList.remove('hidden');
+        sharePopover.innerHTML = '';
+        if (friends.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'share-empty';
+          empty.textContent = 'Add a friend first';
+          sharePopover.appendChild(empty);
+        } else {
+          friends.forEach(f => {
+            const btn = document.createElement('button');
+            btn.textContent = f.email;
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              shareDinnerWithFriend(dinner, f);
+            };
+            sharePopover.appendChild(btn);
+          });
+        }
+      }
 
       grid.appendChild(card);
     });
@@ -906,6 +1010,79 @@
     renderAll();
   }
 
+  function openFriendsModal() {
+    document.getElementById('friendEmailInput').value = '';
+    document.getElementById('friendError').classList.add('hidden');
+    renderFriendsList();
+    document.getElementById('friendsModal').classList.remove('hidden');
+  }
+
+  function closeFriendsModal() {
+    document.getElementById('friendsModal').classList.add('hidden');
+  }
+
+  function renderFriendsList() {
+    const list = document.getElementById('friendsList');
+    list.innerHTML = '';
+    if (friends.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'friends-empty';
+      p.textContent = 'No friends added yet.';
+      list.appendChild(p);
+      return;
+    }
+    friends.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'friend-row';
+      row.innerHTML = `
+        <span>${escapeHtml(f.email)}</span>
+        <button class="remove-friend-btn">Remove</button>
+      `;
+      row.querySelector('.remove-friend-btn').onclick = () => {
+        friends = friends.filter(x => x.uid !== f.uid);
+        saveFriends();
+        renderFriendsList();
+      };
+      list.appendChild(row);
+    });
+  }
+
+  async function addFriendByEmail() {
+    const errorEl = document.getElementById('friendError');
+    errorEl.classList.add('hidden');
+    const email = document.getElementById('friendEmailInput').value.trim().toLowerCase();
+    if (!email) return;
+
+    if (currentUser && email === currentUser.email.toLowerCase()) {
+      errorEl.textContent = "You can't add yourself.";
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    if (friends.some(f => f.email.toLowerCase() === email)) {
+      errorEl.textContent = 'Already in your friends list.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', email));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        errorEl.textContent = 'No account found with that email.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      const friendDoc = snap.docs[0];
+      friends = [{ uid: friendDoc.id, email }, ...friends];
+      await saveFriends();
+      document.getElementById('friendEmailInput').value = '';
+      renderFriendsList();
+    } catch (e) {
+      errorEl.textContent = e.message;
+      errorEl.classList.remove('hidden');
+    }
+  }
+
   function openMacrosModal() {
     const list = document.getElementById('macrosModalList');
     list.innerHTML = '';
@@ -994,6 +1171,12 @@
   document.getElementById('macrosModalCloseBtn').onclick = closeMacrosModal;
   document.getElementById('macrosModalCancelBtn').onclick = closeMacrosModal;
   document.getElementById('macrosModalSaveBtn').onclick = saveMacrosModal;
+  document.getElementById('userEmailLabel').onclick = openFriendsModal;
+  document.getElementById('friendsModalCloseBtn').onclick = closeFriendsModal;
+  document.getElementById('addFriendBtn').onclick = addFriendByEmail;
+  document.getElementById('friendEmailInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addFriendByEmail();
+  });
   document.getElementById('stepsInput').addEventListener('keydown', handleStepsKeydown);
   document.getElementById('stepsInput').addEventListener('input', handleStepsInput);
   document.getElementById('stepsInput').addEventListener('focus', handleStepsFocus);
@@ -1114,12 +1297,16 @@
 
   async function handleAuthUser(user) {
     if (stopSync) { stopSync(); stopSync = null; }
+    if (stopSharedSync) { stopSharedSync(); stopSharedSync = null; }
+    currentUser = user;
 
     if (!user) {
       dinnerDocRef = null;
       dinners = [];
+      friends = [];
       editingId = null;
       document.getElementById('formWrap').classList.add('hidden');
+      document.getElementById('friendsModal').classList.add('hidden');
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
       clearAuthError();
@@ -1143,6 +1330,9 @@
       await signOut(auth).catch(() => {});
       return;
     }
+
+    setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase() }, { merge: true })
+      .catch(e => console.error('Could not update user directory entry', e));
 
     document.getElementById('userEmailLabel').textContent = user.email;
     clearAuthError();
