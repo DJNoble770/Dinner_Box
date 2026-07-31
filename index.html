@@ -23,6 +23,19 @@
     </div>
   </div>
 
+  <div class="auth-screen hidden" id="verifyScreen">
+    <h1>Verify your email</h1>
+    <p class="subtitle" id="verifyEmailMsg">We've sent a verification link to your email.</p>
+    <p class="auth-error hidden" id="verifyError"></p>
+    <div class="auth-actions">
+      <button class="save-btn" id="verifyContinueBtn">I've verified — continue</button>
+    </div>
+    <div class="auth-actions">
+      <button class="cancel-btn" id="resendVerificationBtn">Resend email</button>
+      <button class="cancel-btn" id="verifySignOutBtn">Sign out</button>
+    </div>
+  </div>
+
   <div class="app-content hidden" id="appContent">
   <div class="header-row">
     <div>
@@ -135,7 +148,7 @@
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
   // Your web app's Firebase configuration
   const firebaseConfig = {
@@ -993,6 +1006,16 @@
     document.getElementById('authError').classList.add('hidden');
   }
 
+  function showVerifyError(msg) {
+    const el = document.getElementById('verifyError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  function clearVerifyError() {
+    document.getElementById('verifyError').classList.add('hidden');
+  }
+
   function friendlyAuthError(e) {
     const map = {
       'auth/invalid-email': 'That email address looks invalid.',
@@ -1003,6 +1026,12 @@
       'auth/weak-password': 'Password should be at least 6 characters.',
     };
     return map[e.code] || e.message;
+  }
+
+  function showScreen(id) {
+    ['authScreen', 'verifyScreen', 'appContent'].forEach(sid => {
+      document.getElementById(sid).classList.toggle('hidden', sid !== id);
+    });
   }
 
   document.getElementById('signInBtn').onclick = async () => {
@@ -1021,33 +1050,76 @@
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(cred.user);
     } catch (e) {
       showAuthError(friendlyAuthError(e));
     }
   };
 
-  document.getElementById('signOutBtn').onclick = () => signOut(auth);
+  async function doSignOut() {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error('Sign out failed', e);
+    }
+  }
+  document.getElementById('signOutBtn').onclick = doSignOut;
+  document.getElementById('verifySignOutBtn').onclick = doSignOut;
 
-  onAuthStateChanged(auth, (user) => {
+  document.getElementById('resendVerificationBtn').onclick = async () => {
+    clearVerifyError();
+    try {
+      await sendEmailVerification(auth.currentUser);
+      showVerifyError('Verification email sent — check your inbox (and spam folder).');
+    } catch (e) {
+      showVerifyError(e.message);
+    }
+  };
+
+  document.getElementById('verifyContinueBtn').onclick = async () => {
+    clearVerifyError();
+    try {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        handleAuthUser(auth.currentUser);
+      } else {
+        showVerifyError('Still not verified yet — check your inbox and click the link, then try again.');
+      }
+    } catch (e) {
+      showVerifyError(e.message);
+    }
+  };
+
+  function handleAuthUser(user) {
     if (stopSync) { stopSync(); stopSync = null; }
-    if (user) {
-      document.getElementById('authScreen').classList.add('hidden');
-      document.getElementById('appContent').classList.remove('hidden');
-      document.getElementById('userEmailLabel').textContent = user.email;
-      document.getElementById('authEmail').value = '';
-      document.getElementById('authPassword').value = '';
-      clearAuthError();
-      startSync(user.uid);
-    } else {
+
+    if (!user) {
       dinnerDocRef = null;
       dinners = [];
       editingId = null;
       document.getElementById('formWrap').classList.add('hidden');
-      document.getElementById('appContent').classList.add('hidden');
-      document.getElementById('authScreen').classList.remove('hidden');
+      document.getElementById('authEmail').value = '';
+      document.getElementById('authPassword').value = '';
+      clearAuthError();
+      showScreen('authScreen');
+      return;
     }
-  });
+
+    if (!user.emailVerified) {
+      document.getElementById('verifyEmailMsg').textContent = `We've sent a verification link to ${user.email}. Verify your email, then continue below.`;
+      clearVerifyError();
+      showScreen('verifyScreen');
+      return;
+    }
+
+    document.getElementById('userEmailLabel').textContent = user.email;
+    clearAuthError();
+    showScreen('appContent');
+    startSync(user.uid);
+  }
+
+  onAuthStateChanged(auth, handleAuthUser);
 </script>
 
 </body>
