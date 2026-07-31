@@ -133,19 +133,51 @@
   const UNIT_TO_GRAMS = { g: 1, kg: 1000, ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 240, oz: 28.3495, lb: 453.592 };
   const macroLookupCache = new Map();
 
+  const MACRO_STOPWORDS = new Set(['and', 'with', 'in', 'the', 'of', 'a', 'an', 'or']);
+
+  function tokenize(str) {
+    return (str || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 2 && !MACRO_STOPWORDS.has(w));
+  }
+
+  function tokensOverlap(a, b) {
+    return a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4))));
+  }
+
+  const MACRO_OFFCUT_PARTS = ['skin', 'bone', 'fat', 'giblets', 'liver', 'gizzard', 'heart', 'tripe'];
+
+  function pickBestFood(query, foods) {
+    const queryTokens = tokenize(query);
+    let best = null;
+    let bestScore = -Infinity;
+    foods.forEach(food => {
+      const descTokens = tokenize(food.description);
+      const matchedQuery = queryTokens.filter(qt => descTokens.some(dt => tokensOverlap(qt, dt))).length;
+      const matchedDesc = descTokens.filter(dt => queryTokens.some(qt => tokensOverlap(qt, dt))).length;
+      const extra = descTokens.length - matchedDesc;
+      let score = matchedQuery * 3 - extra;
+      const hasUnaskedOffCut = MACRO_OFFCUT_PARTS.some(p => descTokens.includes(p) && !queryTokens.includes(p));
+      if (hasUnaskedOffCut) score -= 50;
+      if (score > bestScore) {
+        bestScore = score;
+        best = food;
+      }
+    });
+    return best;
+  }
+
   async function fetchMacrosPer100g(name, state) {
     const cacheKey = `${name.trim().toLowerCase()}|${state || ''}`;
     if (macroLookupCache.has(cacheKey)) return macroLookupCache.get(cacheKey);
 
     const query = state ? `${name}, ${state}` : name;
-    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${FDC_API_KEY}&query=${encodeURIComponent(query)}&pageSize=5&dataType=Foundation,SR%20Legacy`;
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${FDC_API_KEY}&query=${encodeURIComponent(query)}&pageSize=10&dataType=Foundation,SR%20Legacy`;
 
     let result = null;
     try {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const food = data.foods && data.foods[0];
+        const food = data.foods && data.foods.length ? pickBestFood(query, data.foods) : null;
         if (food) {
           const getNutrient = (...numbers) => {
             for (const number of numbers) {
