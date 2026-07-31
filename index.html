@@ -1037,18 +1037,7 @@
     });
   }
 
-  document.getElementById('signInBtn').onclick = async () => {
-    clearAuthError();
-    const email = document.getElementById('authEmail').value.trim();
-    const password = document.getElementById('authPassword').value;
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (e) {
-      showAuthError(friendlyAuthError(e));
-    }
-  };
-
-  document.getElementById('signUpBtn').onclick = async () => {
+  async function attemptSignUp() {
     clearAuthError();
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
@@ -1058,7 +1047,35 @@
     } catch (e) {
       showAuthError(friendlyAuthError(e));
     }
-  };
+  }
+
+  async function attemptSignIn({ fallbackToSignUp } = {}) {
+    clearAuthError();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      if (fallbackToSignUp && e.code === 'auth/user-not-found') {
+        await attemptSignUp();
+      } else {
+        showAuthError(friendlyAuthError(e));
+      }
+    }
+  }
+
+  document.getElementById('signInBtn').onclick = () => attemptSignIn();
+  document.getElementById('signUpBtn').onclick = () => attemptSignUp();
+
+  function handleAuthEnterKey(e) {
+    if (e.key !== 'Enter') return;
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    if (!email || !password) return;
+    attemptSignIn({ fallbackToSignUp: true });
+  }
+  document.getElementById('authEmail').addEventListener('keydown', handleAuthEnterKey);
+  document.getElementById('authPassword').addEventListener('keydown', handleAuthEnterKey);
 
   async function doSignOut() {
     try {
