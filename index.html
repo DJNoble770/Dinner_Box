@@ -100,10 +100,16 @@
           <button type="button" class="add-ing-btn" id="macrosBtn">Edit macros</button>
         </div>
       </div>
-      <div>
-        <label class="field-label">Spices</label>
-        <div class="spice-rows" id="spiceRows"></div>
-        <button type="button" class="add-ing-btn" id="addSpiceBtn">+ Add spice</button>
+      <div class="spices-portions-row">
+        <div>
+          <label class="field-label">Spices</label>
+          <div class="spice-rows" id="spiceRows"></div>
+          <button type="button" class="add-ing-btn" id="addSpiceBtn">+ Add spice</button>
+        </div>
+        <div>
+          <label class="field-label">Portions</label>
+          <input class="field-input" id="portionsInput" type="number" min="1" step="1" placeholder="e.g. 4">
+        </div>
       </div>
       <div>
         <label class="field-label">Recipe steps (optional)</label>
@@ -603,7 +609,14 @@
 
     filtered.forEach(dinner => {
       const meta = proteinMeta(dinner.protein);
-      const macroTotals = dinnerMacroTotals(dinner);
+      const macroTotalsRaw = dinnerMacroTotals(dinner);
+      const portions = dinner.portions && dinner.portions > 0 ? dinner.portions : null;
+      const macroTotals = macroTotalsRaw && portions ? {
+        calories: Math.round(macroTotalsRaw.calories / portions),
+        protein: macroTotalsRaw.protein / portions,
+        carbs: macroTotalsRaw.carbs / portions,
+        fat: macroTotalsRaw.fat / portions,
+      } : macroTotalsRaw;
       const card = document.createElement('div');
       card.className = 'card' + (pickedId === dinner.id ? ' picked' : '');
       card.id = 'dinner-' + dinner.id;
@@ -612,15 +625,16 @@
         <div class="dot" style="background:${meta.color}"></div>
         <div class="protein-label" style="color:${meta.color}">${meta.label}</div>
         <h4>${escapeHtml(dinner.name)}</h4>
-        ${(dinner.method || dinner.temp || dinner.time) ? `
+        ${(dinner.method || dinner.temp || dinner.time || portions) ? `
           <div class="meta-row">
             <span class="meta-item">${dinner.method ? escapeHtml(methodLabel(dinner.method)) : ''}</span>
             <span class="meta-item">${dinner.temp ? escapeHtml(dinner.temp) : ''}</span>
             <span class="meta-item">${dinner.time ? escapeHtml(dinner.time) : ''}</span>
+            <span class="meta-item">${portions ? `Serves ${portions}` : ''}</span>
           </div>
         ` : ''}
         ${macroTotals ? `
-          <div class="macro-row">${macroTotals.calories} kcal · ${Math.round(macroTotals.protein)}g protein · ${Math.round(macroTotals.carbs)}g carbs · ${Math.round(macroTotals.fat)}g fat</div>
+          <div class="macro-row">${macroTotals.calories} kcal · ${Math.round(macroTotals.protein)}g protein · ${Math.round(macroTotals.carbs)}g carbs · ${Math.round(macroTotals.fat)}g fat${portions ? ' per portion' : ''}</div>
         ` : ''}
         <div class="toggle-row">
           <button class="toggle-ing">
@@ -755,6 +769,7 @@
     document.getElementById('methodInput').value = dinner ? (dinner.method || '') : '';
     document.getElementById('tempInput').value = dinner ? (dinner.temp || '') : '';
     document.getElementById('timeInput').value = dinner ? (dinner.time || '') : '';
+    document.getElementById('portionsInput').value = dinner ? (dinner.portions || '') : '';
     document.getElementById('stepsInput').value = dinner ? renumberStepsText(dinner.steps || '') : '';
     renderIngredientRows(dinner ? dinner.ingredients : []);
     renderSpiceRows(dinner ? dinner.spices : []);
@@ -1048,16 +1063,17 @@
     const method = document.getElementById('methodInput').value;
     const temp = document.getElementById('tempInput').value.trim();
     const time = document.getElementById('timeInput').value.trim();
+    const portions = parseInt(document.getElementById('portionsInput').value, 10) || null;
     const steps = document.getElementById('stepsInput').value.trim();
 
     const protein = detectProteinFromName(name);
 
     if (editingId) {
       dinners = dinners.map(d => d.id === editingId
-        ? { ...d, name, protein, ingredients, spices, method, temp, time, steps }
+        ? { ...d, name, protein, ingredients, spices, method, temp, time, portions, steps }
         : d);
     } else {
-      dinners = [{ id: 'dinner-' + Date.now(), name, protein, ingredients, spices, method, temp, time, steps }, ...dinners];
+      dinners = [{ id: 'dinner-' + Date.now(), name, protein, ingredients, spices, method, temp, time, portions, steps }, ...dinners];
     }
     saveData();
     closeForm();

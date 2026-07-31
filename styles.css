@@ -486,6 +486,13 @@ button {
   gap: 8px;
 }
 
+.spices-portions-row {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 8px;
+  align-items: end;
+}
+
 label.field-label {
   display: block;
   font-size: 12px;
