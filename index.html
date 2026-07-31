@@ -33,10 +33,6 @@
         <input class="field-input" id="nameInput" placeholder="e.g. Honey garlic chicken thighs">
       </div>
       <div>
-        <label class="field-label">Main protein</label>
-        <div class="protein-picker" id="proteinPicker"></div>
-      </div>
-      <div>
         <label class="field-label">Ingredients</label>
         <div class="ingredient-rows" id="ingredientRows"></div>
         <div class="ing-btn-row">
@@ -136,15 +132,29 @@
   const dinnerDocRef = doc(db, "dinnerBox", "shared");
 
   const PROTEINS = [
-    { id: 'chicken',    label: 'Chicken',          color: '#B5772E', bg: '#F3E3CB' },
-    { id: 'beef',       label: 'Beef',             color: '#8C3B2E', bg: '#EAD3CB' },
-    { id: 'pork',       label: 'Pork',             color: '#A14E63', bg: '#F0DCE1' },
-    { id: 'fish',       label: 'Fish / seafood',   color: '#2E6E8C', bg: '#D6E7EE' },
-    { id: 'vegetarian', label: 'Vegetarian',       color: '#3F7A3C', bg: '#DCE9D6' },
-    { id: 'other',      label: 'Other',            color: '#6B6357', bg: '#E7E2D6' },
+    { id: 'chicken', label: 'Chicken',        color: '#B5772E', bg: '#F3E3CB' },
+    { id: 'beef',    label: 'Beef',           color: '#8C3B2E', bg: '#EAD3CB' },
+    { id: 'pork',    label: 'Pork',           color: '#A14E63', bg: '#F0DCE1' },
+    { id: 'fish',    label: 'Fish / seafood', color: '#2E6E8C', bg: '#D6E7EE' },
+    { id: 'other',   label: 'Other',          color: '#6B6357', bg: '#E7E2D6' },
   ];
 
-  const proteinMeta = id => PROTEINS.find(p => p.id === id) || PROTEINS[5];
+  const PROTEIN_KEYWORDS = {
+    chicken: ['chicken', 'poultry', 'turkey'],
+    beef: ['beef', 'steak', 'mince', 'burger', 'meatball', 'brisket'],
+    pork: ['pork', 'bacon', 'ham', 'sausage', 'chorizo', 'gammon'],
+    fish: ['fish', 'salmon', 'tuna', 'cod', 'prawn', 'shrimp', 'seafood', 'haddock', 'mackerel', 'anchov'],
+  };
+
+  function detectProteinFromName(name) {
+    const n = (name || '').toLowerCase();
+    for (const id of Object.keys(PROTEIN_KEYWORDS)) {
+      if (PROTEIN_KEYWORDS[id].some(kw => n.includes(kw))) return id;
+    }
+    return 'other';
+  }
+
+  const proteinMeta = id => PROTEINS.find(p => p.id === id) || PROTEINS[PROTEINS.length - 1];
 
   const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'pinch', 'whole'];
 
@@ -165,9 +175,13 @@
   function pickBestFood(query, foods) {
     const queryTokens = tokenize(query);
     let best = null;
-    let bestKey = Infinity;
+    let bestCleanCount = -1;
+    let bestPositionSum = Infinity;
+
     foods.forEach(food => {
       const descTokens = tokenize(food.description);
+      const segments = food.description.split(',').map(seg => tokenize(seg));
+
       let positionSum = 0;
       let matchedCount = 0;
       queryTokens.forEach(qt => {
@@ -180,11 +194,21 @@
         }
       });
       if (matchedCount === 0) return;
-      if (positionSum < bestKey) {
-        bestKey = positionSum;
+
+      const cleanCount = queryTokens.filter(qt =>
+        segments.some(seg =>
+          seg.some(t => tokensOverlap(qt, t)) &&
+          seg.every(t => queryTokens.some(q2 => tokensOverlap(q2, t)))
+        )
+      ).length;
+
+      if (cleanCount > bestCleanCount || (cleanCount === bestCleanCount && positionSum < bestPositionSum)) {
+        bestCleanCount = cleanCount;
+        bestPositionSum = positionSum;
         best = food;
       }
     });
+
     return best || foods[0];
   }
 
@@ -314,7 +338,7 @@
     {
       id: 'seed-3',
       name: 'Chickpea and spinach curry',
-      protein: 'vegetarian',
+      protein: 'other',
       ingredients: [
         { name: 'Chickpeas', amount: '2', unit: 'cup' },
         { name: 'Spinach', amount: '200', unit: 'g' },
@@ -335,7 +359,6 @@
   let activeFilters = [];
   let searchTerm = '';
   let editingId = null;
-  let selectedProtein = 'chicken';
   let pickedId = null;
 
   function startSync() {
@@ -527,7 +550,6 @@
 
   function openForm(dinner) {
     editingId = dinner ? dinner.id : null;
-    selectedProtein = dinner ? dinner.protein : 'chicken';
     document.getElementById('formTitle').textContent = dinner ? 'Edit dinner' : 'Add a dinner idea';
     document.getElementById('saveBtn').textContent = dinner ? 'Save changes' : 'Add to the box';
     document.getElementById('nameInput').value = dinner ? dinner.name : '';
@@ -537,7 +559,6 @@
     document.getElementById('stepsInput').value = dinner ? renumberStepsText(dinner.steps || '') : '';
     renderIngredientRows(dinner ? dinner.ingredients : []);
     renderSpiceRows(dinner ? dinner.spices : []);
-    renderProteinPicker();
     document.getElementById('formWrap').classList.remove('hidden');
   }
 
@@ -545,24 +566,6 @@
     editingId = null;
     document.getElementById('formWrap').classList.add('hidden');
     document.getElementById('macrosModal').classList.add('hidden');
-  }
-
-  function renderProteinPicker() {
-    const wrap = document.getElementById('proteinPicker');
-    wrap.innerHTML = '';
-    PROTEINS.forEach(p => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'protein-btn' + (selectedProtein === p.id ? ' selected' : '');
-      btn.textContent = p.label;
-      if (selectedProtein === p.id) {
-        btn.style.borderColor = p.color;
-        btn.style.background = p.bg;
-        btn.style.color = p.color;
-      }
-      btn.onclick = () => { selectedProtein = p.id; renderProteinPicker(); };
-      wrap.appendChild(btn);
-    });
   }
 
   let ingredientRowCount = 0;
@@ -848,12 +851,14 @@
     const time = document.getElementById('timeInput').value.trim();
     const steps = document.getElementById('stepsInput').value.trim();
 
+    const protein = detectProteinFromName(name);
+
     if (editingId) {
       dinners = dinners.map(d => d.id === editingId
-        ? { ...d, name, protein: selectedProtein, ingredients, spices, method, temp, time, steps }
+        ? { ...d, name, protein, ingredients, spices, method, temp, time, steps }
         : d);
     } else {
-      dinners = [{ id: 'dinner-' + Date.now(), name, protein: selectedProtein, ingredients, spices, method, temp, time, steps }, ...dinners];
+      dinners = [{ id: 'dinner-' + Date.now(), name, protein, ingredients, spices, method, temp, time, steps }, ...dinners];
     }
     saveData();
     closeForm();

@@ -501,24 +501,6 @@ label.field-label {
   margin-top: 2px;
 }
 
-.protein-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.protein-btn {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid #C9B98F;
-  background: #FFFDF8;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-}
-.protein-btn.selected {
-  border-width: 2px;
-}
-
 .form-actions {
   display: flex;
   gap: 10px;
