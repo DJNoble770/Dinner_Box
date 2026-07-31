@@ -9,15 +9,34 @@
 <body>
 
 <div class="app">
+  <div class="auth-screen" id="authScreen">
+    <h1>The Main Meal</h1>
+    <p class="subtitle">Sign in to see your own dinner box</p>
+    <div class="auth-form">
+      <input class="field-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
+      <input class="field-input" id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
+      <p class="auth-error hidden" id="authError"></p>
+      <div class="auth-actions">
+        <button class="save-btn" id="signInBtn">Sign in</button>
+        <button class="cancel-btn" id="signUpBtn">Create account</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-content hidden" id="appContent">
   <div class="header-row">
     <div>
       <h1>The Main Meal</h1>
       <p class="subtitle" id="countLabel">0 ideas on file</p>
     </div>
-    <button class="btn-primary" id="addBtn">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Add dinner
-    </button>
+    <div class="header-actions">
+      <span class="user-email" id="userEmailLabel"></span>
+      <button class="btn-ghost" id="signOutBtn">Sign out</button>
+      <button class="btn-primary" id="addBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add dinner
+      </button>
+    </div>
   </div>
 
   <div class="form-wrap hidden" id="formWrap">
@@ -31,19 +50,6 @@
       <div>
         <label class="field-label">Dish name</label>
         <input class="field-input" id="nameInput" placeholder="e.g. Honey garlic chicken thighs">
-      </div>
-      <div>
-        <label class="field-label">Ingredients</label>
-        <div class="ingredient-rows" id="ingredientRows"></div>
-        <div class="ing-btn-row">
-          <button type="button" class="add-ing-btn" id="addIngredientBtn">+ Add ingredient</button>
-          <button type="button" class="add-ing-btn" id="macrosBtn">Edit macros</button>
-        </div>
-      </div>
-      <div>
-        <label class="field-label">Spices</label>
-        <div class="spice-rows" id="spiceRows"></div>
-        <button type="button" class="add-ing-btn" id="addSpiceBtn">+ Add spice</button>
       </div>
       <div class="method-row">
         <div>
@@ -67,6 +73,19 @@
           <label class="field-label">Time (optional)</label>
           <input class="field-input" id="timeInput" placeholder="30 min">
         </div>
+      </div>
+      <div>
+        <label class="field-label">Ingredients</label>
+        <div class="ingredient-rows" id="ingredientRows"></div>
+        <div class="ing-btn-row">
+          <button type="button" class="add-ing-btn" id="addIngredientBtn">+ Add ingredient</button>
+          <button type="button" class="add-ing-btn" id="macrosBtn">Edit macros</button>
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Spices</label>
+        <div class="spice-rows" id="spiceRows"></div>
+        <button type="button" class="add-ing-btn" id="addSpiceBtn">+ Add spice</button>
       </div>
       <div>
         <label class="field-label">Recipe steps (optional)</label>
@@ -93,6 +112,7 @@
   </div>
 
   <div class="grid" id="cardGrid"></div>
+  </div>
 </div>
 
 <div class="modal-overlay hidden" id="macrosModal">
@@ -115,6 +135,7 @@
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
   // Your web app's Firebase configuration
   const firebaseConfig = {
@@ -129,7 +150,9 @@
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const dinnerDocRef = doc(db, "dinnerBox", "shared");
+  const auth = getAuth(app);
+  let dinnerDocRef = null;
+  let stopSync = null;
 
   const PROTEINS = [
     { id: 'chicken', label: 'Chicken',        color: '#B5772E', bg: '#F3E3CB' },
@@ -361,8 +384,9 @@
   let editingId = null;
   let pickedId = null;
 
-  function startSync() {
-    onSnapshot(dinnerDocRef, (snapshot) => {
+  function startSync(uid) {
+    dinnerDocRef = doc(db, "dinnerBox", uid);
+    stopSync = onSnapshot(dinnerDocRef, (snapshot) => {
       if (snapshot.exists()) {
         dinners = snapshot.data().dinners || [];
       } else {
@@ -378,10 +402,11 @@
   }
 
   async function saveData() {
+    if (!dinnerDocRef) return;
     try {
       await setDoc(dinnerDocRef, { dinners }, { merge: true });
     } catch (e) {
-      console.error('Could not save to the shared database', e);
+      console.error('Could not save to the database', e);
     }
   }
 
@@ -958,7 +983,71 @@
   document.getElementById('stepsInput').addEventListener('focus', handleStepsFocus);
   document.getElementById('tempInput').addEventListener('blur', handleTempBlur);
 
-  startSync();
+  function showAuthError(msg) {
+    const el = document.getElementById('authError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  function clearAuthError() {
+    document.getElementById('authError').classList.add('hidden');
+  }
+
+  function friendlyAuthError(e) {
+    const map = {
+      'auth/invalid-email': 'That email address looks invalid.',
+      'auth/user-not-found': 'No account found with that email.',
+      'auth/wrong-password': 'Incorrect password.',
+      'auth/invalid-credential': 'Incorrect email or password.',
+      'auth/email-already-in-use': 'An account with that email already exists.',
+      'auth/weak-password': 'Password should be at least 6 characters.',
+    };
+    return map[e.code] || e.message;
+  }
+
+  document.getElementById('signInBtn').onclick = async () => {
+    clearAuthError();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      showAuthError(friendlyAuthError(e));
+    }
+  };
+
+  document.getElementById('signUpBtn').onclick = async () => {
+    clearAuthError();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      showAuthError(friendlyAuthError(e));
+    }
+  };
+
+  document.getElementById('signOutBtn').onclick = () => signOut(auth);
+
+  onAuthStateChanged(auth, (user) => {
+    if (stopSync) { stopSync(); stopSync = null; }
+    if (user) {
+      document.getElementById('authScreen').classList.add('hidden');
+      document.getElementById('appContent').classList.remove('hidden');
+      document.getElementById('userEmailLabel').textContent = user.email;
+      document.getElementById('authEmail').value = '';
+      document.getElementById('authPassword').value = '';
+      clearAuthError();
+      startSync(user.uid);
+    } else {
+      dinnerDocRef = null;
+      dinners = [];
+      editingId = null;
+      document.getElementById('formWrap').classList.add('hidden');
+      document.getElementById('appContent').classList.add('hidden');
+      document.getElementById('authScreen').classList.remove('hidden');
+    }
+  });
 </script>
 
 </body>
