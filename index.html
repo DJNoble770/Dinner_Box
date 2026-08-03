@@ -18,13 +18,28 @@
       <p class="auth-error hidden" id="authError"></p>
       <div class="auth-actions">
         <button class="save-btn" id="signInBtn">Sign in</button>
-        <button class="cancel-btn" id="signUpBtn">Create account</button>
+        <button class="cancel-btn" id="goToSignUpBtn">Create account</button>
       </div>
       <div class="auth-divider"><span>or</span></div>
       <button class="google-btn" id="googleSignInBtn">
         <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.4 0 10.3-2.1 14-5.5l-6.5-5.5C29.4 34.9 26.8 36 24 36c-5.3 0-9.7-3.1-11.3-7.4l-6.5 5C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.5C41.4 35.9 44 30.4 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
         Sign in with Google
       </button>
+    </div>
+  </div>
+
+  <div class="auth-screen hidden" id="signUpScreen">
+    <h1>Create account</h1>
+    <p class="subtitle">Set up your own dinner box</p>
+    <div class="auth-form">
+      <input class="field-input" id="signUpEmail" type="email" placeholder="Email" autocomplete="email">
+      <input class="field-input" id="signUpPassword" type="password" placeholder="Password" autocomplete="new-password">
+      <input class="field-input" id="signUpPasswordConfirm" type="password" placeholder="Confirm password" autocomplete="new-password">
+      <p class="auth-error hidden" id="signUpError"></p>
+      <div class="auth-actions">
+        <button class="save-btn" id="signUpSubmitBtn">Create account</button>
+        <button class="cancel-btn" id="signUpBackBtn">Back to sign in</button>
+      </div>
     </div>
   </div>
 
@@ -163,6 +178,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
+    <div class="friends-section-heading hidden" id="pendingFriendReqHeading">Friend requests</div>
+    <div class="pending-shares-list" id="pendingFriendReqList"></div>
+
     <div class="friends-section-heading" id="pendingSharesHeading">Shared with you</div>
     <div class="pending-shares-list" id="pendingSharesList"></div>
 
@@ -181,6 +199,11 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import emailjs from "https://cdn.jsdelivr.net/npm/@emailjs/browser@4/+esm";
+
+  const EMAILJS_SERVICE_ID = 'service_aids_2g8';
+  const EMAILJS_TEMPLATE_ID = 'template_c7kfxda';
+  emailjs.init({ publicKey: 'IUE955GhZ0deS3BWZ' });
 
   // Your web app's Firebase configuration
   const firebaseConfig = {
@@ -199,10 +222,50 @@
   let dinnerDocRef = null;
   let stopSync = null;
   let stopSharedSync = null;
+  let stopFriendReqSync = null;
+  let stopFriendConfirmSync = null;
   let friends = [];
   let currentUser = null;
   let openShareDinnerId = null;
   let pendingShares = [];
+  let pendingFriendRequests = [];
+
+  const NOTIFY_BATCH_DELAY_MS = 5 * 60 * 1000;
+  const notifyQueues = new Map();
+
+  function queueEmailNotification(toEmail, line) {
+    if (!toEmail) return;
+    let entry = notifyQueues.get(toEmail);
+    if (!entry) {
+      entry = { items: [], timer: null };
+      notifyQueues.set(toEmail, entry);
+    }
+    entry.items.push(line);
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => flushEmailNotification(toEmail), NOTIFY_BATCH_DELAY_MS);
+  }
+
+  function flushEmailNotification(toEmail) {
+    const entry = notifyQueues.get(toEmail);
+    if (!entry || entry.items.length === 0) return;
+    notifyQueues.delete(toEmail);
+
+    const message = entry.items.map(line => `• ${line}`).join('\n');
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: toEmail,
+      subject: 'Activity on The Dinner Box',
+      message,
+    }).catch(e => console.error('Could not send notification email', e));
+  }
+
+  function flushAllEmailNotificationsNow() {
+    notifyQueues.forEach((entry, toEmail) => {
+      if (entry.timer) clearTimeout(entry.timer);
+      flushEmailNotification(toEmail);
+    });
+  }
+
+  window.addEventListener('beforeunload', flushAllEmailNotificationsNow);
 
   const PROTEINS = [
     { id: 'chicken', label: 'Chicken',        color: '#B5772E', bg: '#F3E3CB' },
@@ -462,17 +525,43 @@
     }, (error) => {
       console.error('Shared inbox sync error', error);
     });
+
+    stopFriendReqSync = onSnapshot(collection(db, "dinnerBox", uid, "friendRequests"), (snapshot) => {
+      pendingFriendRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      updatePendingBadge();
+      if (!document.getElementById('friendsModal').classList.contains('hidden')) {
+        renderPendingFriendRequests();
+      }
+    }, (error) => {
+      console.error('Friend request sync error', error);
+    });
+
+    stopFriendConfirmSync = onSnapshot(collection(db, "dinnerBox", uid, "friendConfirmations"), (snapshot) => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type !== 'added') return;
+        const confirmation = change.doc.data();
+        friends = friends.map(f => f.uid === confirmation.fromUid ? { ...f, status: 'accepted' } : f);
+        saveFriends();
+        if (!document.getElementById('friendsModal').classList.contains('hidden')) {
+          renderFriendsList();
+        }
+        deleteDoc(change.doc.ref).catch(e => console.error('Could not clear friend confirmation', e));
+      });
+    }, (error) => {
+      console.error('Friend confirmation sync error', error);
+    });
   }
 
   function updatePendingBadge() {
     const btn = document.getElementById('userEmailLabel');
-    btn.classList.toggle('has-pending', pendingShares.length > 0);
+    const totalPending = pendingShares.length + pendingFriendRequests.length;
+    btn.classList.toggle('has-pending', totalPending > 0);
     const existingBadge = btn.querySelector('.pending-badge');
     if (existingBadge) existingBadge.remove();
-    if (pendingShares.length > 0) {
+    if (totalPending > 0) {
       const badge = document.createElement('span');
       badge.className = 'pending-badge';
-      badge.textContent = pendingShares.length;
+      badge.textContent = totalPending;
       btn.appendChild(badge);
     }
   }
@@ -525,6 +614,7 @@
         ? { ...d, sharedToUids: [...(d.sharedToUids || []), friend.uid] }
         : d);
       await saveData();
+      queueEmailNotification(friend.email, `${currentUser.email} shared "${dinner.name}" with you.`);
       openShareDinnerId = null;
       renderCards();
     } catch (e) {
@@ -711,13 +801,14 @@
       if (openShareDinnerId === dinner.id) {
         sharePopover.classList.remove('hidden');
         sharePopover.innerHTML = '';
-        if (friends.length === 0) {
+        const confirmedFriends = friends.filter(f => f.status === 'accepted');
+        if (confirmedFriends.length === 0) {
           const empty = document.createElement('div');
           empty.className = 'share-empty';
-          empty.textContent = 'Add a friend first';
+          empty.textContent = 'No confirmed friends yet';
           sharePopover.appendChild(empty);
         } else {
-          friends.forEach(f => {
+          confirmedFriends.forEach(f => {
             const btn = document.createElement('button');
             const allowed = canShareDinnerWithFriend(dinner, f);
             if (!allowed) {
@@ -1085,6 +1176,7 @@
     document.getElementById('friendError').classList.add('hidden');
     renderFriendsList();
     renderPendingShares();
+    renderPendingFriendRequests();
     document.getElementById('friendsModal').classList.remove('hidden');
   }
 
@@ -1138,7 +1230,10 @@
       const row = document.createElement('div');
       row.className = 'friend-row';
       row.innerHTML = `
-        <span>${escapeHtml(f.email)}</span>
+        <span>
+          ${escapeHtml(f.email)}
+          ${f.status === 'pending' ? '<span class="friend-pending-label">Awaiting confirmation</span>' : ''}
+        </span>
         <button class="remove-friend-btn">Remove</button>
       `;
       row.querySelector('.remove-friend-btn').onclick = () => {
@@ -1146,6 +1241,38 @@
         saveFriends();
         renderFriendsList();
       };
+      list.appendChild(row);
+    });
+  }
+
+  function renderPendingFriendRequests() {
+    const heading = document.getElementById('pendingFriendReqHeading');
+    const list = document.getElementById('pendingFriendReqList');
+    list.innerHTML = '';
+
+    if (pendingFriendRequests.length === 0) {
+      heading.classList.add('hidden');
+      list.classList.add('hidden');
+      return;
+    }
+    heading.classList.remove('hidden');
+    list.classList.remove('hidden');
+
+    pendingFriendRequests.forEach(req => {
+      const row = document.createElement('div');
+      row.className = 'pending-share-row';
+      row.innerHTML = `
+        <div class="pending-share-info">
+          <span class="pending-share-name">${escapeHtml(req.fromEmail || 'Someone')}</span>
+          <span class="pending-share-from">wants to be your friend</span>
+        </div>
+        <div class="pending-share-actions">
+          <button class="accept-share-btn">Accept</button>
+          <button class="decline-share-btn">Decline</button>
+        </div>
+      `;
+      row.querySelector('.accept-share-btn').onclick = () => acceptFriendRequest(req);
+      row.querySelector('.decline-share-btn').onclick = () => declineFriendRequest(req);
       list.appendChild(row);
     });
   }
@@ -1176,14 +1303,36 @@
         return;
       }
       const friendDoc = snap.docs[0];
-      friends = [{ uid: friendDoc.id, email }, ...friends];
+      friends = [{ uid: friendDoc.id, email, status: 'pending' }, ...friends];
       await saveFriends();
+      await addDoc(collection(db, 'dinnerBox', friendDoc.id, 'friendRequests'), {
+        fromUid: currentUser.uid,
+        fromEmail: currentUser.email,
+      });
+      queueEmailNotification(email, `${currentUser.email} sent you a friend request on The Dinner Box.`);
       document.getElementById('friendEmailInput').value = '';
       renderFriendsList();
     } catch (e) {
       errorEl.textContent = e.message;
       errorEl.classList.remove('hidden');
     }
+  }
+
+  async function acceptFriendRequest(req) {
+    if (!friends.some(f => f.uid === req.fromUid)) {
+      friends = [{ uid: req.fromUid, email: req.fromEmail, status: 'accepted' }, ...friends];
+      await saveFriends();
+    }
+    await addDoc(collection(db, 'dinnerBox', req.fromUid, 'friendConfirmations'), {
+      fromUid: currentUser.uid,
+      fromEmail: currentUser.email,
+    });
+    await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'friendRequests', req.id)).catch(e => console.error('Could not clear friend request', e));
+    renderFriendsList();
+  }
+
+  async function declineFriendRequest(req) {
+    await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'friendRequests', req.id)).catch(e => console.error('Could not clear friend request', e));
   }
 
   function openMacrosModal() {
@@ -1318,40 +1467,62 @@
   }
 
   function showScreen(id) {
-    ['authScreen', 'verifyScreen', 'appContent'].forEach(sid => {
+    ['authScreen', 'signUpScreen', 'verifyScreen', 'appContent'].forEach(sid => {
       document.getElementById(sid).classList.toggle('hidden', sid !== id);
     });
   }
 
+  function showSignUpScreen() {
+    document.getElementById('signUpEmail').value = document.getElementById('authEmail').value.trim();
+    document.getElementById('signUpPassword').value = '';
+    document.getElementById('signUpPasswordConfirm').value = '';
+    document.getElementById('signUpError').classList.add('hidden');
+    showScreen('signUpScreen');
+  }
+
+  function showSignInScreen() {
+    document.getElementById('authError').classList.add('hidden');
+    showScreen('authScreen');
+  }
+
   async function attemptSignUp() {
-    clearAuthError();
-    const email = document.getElementById('authEmail').value.trim();
-    const password = document.getElementById('authPassword').value;
+    const errorEl = document.getElementById('signUpError');
+    errorEl.classList.add('hidden');
+    const email = document.getElementById('signUpEmail').value.trim();
+    const password = document.getElementById('signUpPassword').value;
+    const confirmPassword = document.getElementById('signUpPasswordConfirm').value;
+
+    if (!email || !password || !confirmPassword) return;
+    if (password !== confirmPassword) {
+      errorEl.textContent = "Passwords don't match.";
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(cred.user);
     } catch (e) {
-      showAuthError(friendlyAuthError(e));
+      errorEl.textContent = friendlyAuthError(e);
+      errorEl.classList.remove('hidden');
     }
   }
 
-  async function attemptSignIn({ fallbackToSignUp } = {}) {
+  async function attemptSignIn() {
     clearAuthError();
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (e) {
-      if (fallbackToSignUp && e.code === 'auth/user-not-found') {
-        await attemptSignUp();
-      } else {
-        showAuthError(friendlyAuthError(e));
-      }
+      showAuthError(friendlyAuthError(e));
     }
   }
 
   document.getElementById('signInBtn').onclick = () => attemptSignIn();
-  document.getElementById('signUpBtn').onclick = () => attemptSignUp();
+  document.getElementById('goToSignUpBtn').onclick = showSignUpScreen;
+  document.getElementById('signUpBackBtn').onclick = showSignInScreen;
+  document.getElementById('signUpSubmitBtn').onclick = attemptSignUp;
 
   document.getElementById('googleSignInBtn').onclick = async () => {
     clearAuthError();
@@ -1369,10 +1540,17 @@
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     if (!email || !password) return;
-    attemptSignIn({ fallbackToSignUp: true });
+    attemptSignIn();
   }
   document.getElementById('authEmail').addEventListener('keydown', handleAuthEnterKey);
   document.getElementById('authPassword').addEventListener('keydown', handleAuthEnterKey);
+
+  function handleSignUpEnterKey(e) {
+    if (e.key === 'Enter') attemptSignUp();
+  }
+  document.getElementById('signUpEmail').addEventListener('keydown', handleSignUpEnterKey);
+  document.getElementById('signUpPassword').addEventListener('keydown', handleSignUpEnterKey);
+  document.getElementById('signUpPasswordConfirm').addEventListener('keydown', handleSignUpEnterKey);
 
   async function doSignOut() {
     try {
@@ -1412,6 +1590,8 @@
   async function handleAuthUser(user) {
     if (stopSync) { stopSync(); stopSync = null; }
     if (stopSharedSync) { stopSharedSync(); stopSharedSync = null; }
+    if (stopFriendReqSync) { stopFriendReqSync(); stopFriendReqSync = null; }
+    if (stopFriendConfirmSync) { stopFriendConfirmSync(); stopFriendConfirmSync = null; }
     currentUser = user;
 
     if (!user) {
@@ -1419,6 +1599,7 @@
       dinners = [];
       friends = [];
       pendingShares = [];
+      pendingFriendRequests = [];
       updatePendingBadge();
       editingId = null;
       document.getElementById('formWrap').classList.add('hidden');

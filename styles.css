@@ -69,6 +69,7 @@ h1 {
   padding: 0;
 }
 
+.hidden { display: none; }
 .app-content.hidden { display: none; }
 
 .auth-screen {
@@ -602,6 +603,13 @@ label.field-label {
   font-size: 13px;
   color: var(--ink);
 }
+.friend-pending-label {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--muted);
+}
 .friend-row .remove-friend-btn {
   background: none;
   border: none;
@@ -746,4 +754,58 @@ label.field-label {
   border-radius: 6px;
   padding: 9px 18px;
   color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  body { padding: 12px; }
+
+  .app {
+    padding: 18px 14px;
+    border-radius: 8px;
+  }
+
+  h1 { font-size: 24px; }
+
+  .header-row { align-items: stretch; }
+  .header-actions { justify-content: space-between; }
+  .header-actions .btn-primary { flex: 1; justify-content: center; }
+
+  .toolbar { flex-direction: column; }
+  .search-wrap { min-width: 0; }
+
+  .method-row,
+  .spices-portions-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ingredient-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "name name"
+      "amount unit"
+      "state remove";
+  }
+  .ingredient-row .ing-name { grid-area: name; }
+  .ingredient-row .ing-amount { grid-area: amount; }
+  .ingredient-row .ing-unit { grid-area: unit; }
+  .ingredient-row .ing-state { grid-area: state; }
+  .ingredient-row .remove-ing-btn { grid-area: remove; justify-self: end; }
+
+  .ing-btn-row { flex-direction: column; align-items: stretch; }
+  .ing-btn-row .add-ing-btn { text-align: center; }
+
+  .form-actions { flex-direction: column; }
+  .form-actions button { width: 100%; }
+
+  .macro-modal-row { flex-direction: column; align-items: stretch; }
+  .macro-modal-inputs { grid-template-columns: repeat(4, 1fr); }
+
+  .modal-panel { padding: 16px; }
+
+  .friend-add-row { flex-direction: column; }
+
+  .card-actions { flex-wrap: wrap; }
+  .share-popover { right: auto; left: 0; }
+
+  .auth-screen { max-width: 100%; margin: 20px auto; }
 }
