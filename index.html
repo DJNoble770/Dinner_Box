@@ -224,17 +224,13 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-
 <script type="module">
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
-  const EMAILJS_SERVICE_ID = 'service_1vz9m2g';
-  const EMAILJS_TEMPLATE_ID = 'template_c7kfxda';
-  emailjs.init({ publicKey: 'IUE955GhZ0deS3BWZ' });
+  const NOTIFY_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxpZKnTSXovzQvPZvxEqtQvq0L-WYClTqmKuXShDFr-jI9qCBGrZTMrXWO5zfueqoI/exec';
 
   // Your web app's Firebase configuration
   const firebaseConfig = {
@@ -268,19 +264,19 @@
       console.warn('sendEmailNotification: no recipient email, skipping');
       return;
     }
-    if (typeof emailjs === 'undefined') {
-      console.error('sendEmailNotification: emailjs library is not loaded');
-      return;
-    }
-    console.log('Sending EmailJS notification to', toEmail, '-', line);
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email: toEmail,
-      subject: 'Activity on The Dinner Box',
-      message: line,
-    }).then(res => {
-      console.log('EmailJS notification sent OK', res.status, res.text);
+    console.log('Sending notification to', toEmail, '-', line);
+    fetch(NOTIFY_WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({
+        to: toEmail,
+        subject: 'Activity on The Dinner Box',
+        message: line,
+      }),
+    }).then(() => {
+      console.log('Notification request sent (no-cors, response not readable)');
     }).catch(e => {
-      console.error('EmailJS notification failed', e);
+      console.error('Notification request failed', e);
     });
   }
 
