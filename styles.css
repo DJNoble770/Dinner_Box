@@ -452,6 +452,64 @@ button {
   margin: 4px 0 8px;
 }
 
+.account-modal-panel { max-width: 640px; }
+
+.account-name-row {
+  margin-bottom: 16px;
+}
+.account-display-name {
+  display: inline-block;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 20px;
+  color: var(--ink);
+  cursor: pointer;
+  border-bottom: 1px dashed #C9B98F;
+}
+.account-name-row .field-input {
+  max-width: 260px;
+}
+
+.account-body {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.account-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+  border-right: 1px solid #E5D9B8;
+  padding-right: 12px;
+  flex-shrink: 0;
+}
+.account-tab-btn {
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.account-tab-btn.active {
+  background: #F0E6C8;
+  color: var(--ink);
+}
+
+.account-tab-panels { flex: 1; min-width: 0; }
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+  padding: 8px 0;
+}
+
 .form-wrap {
   background: var(--card);
   border: 2px dashed #C9B98F;
@@ -808,4 +866,15 @@ label.field-label {
   .share-popover { right: auto; left: 0; }
 
   .auth-screen { max-width: 100%; margin: 20px auto; }
+
+  .account-body { flex-direction: column; }
+  .account-tabs {
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid #E5D9B8;
+    padding-right: 0;
+    padding-bottom: 8px;
+    width: 100%;
+    overflow-x: auto;
+  }
 }

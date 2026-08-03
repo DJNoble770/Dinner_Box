@@ -170,27 +170,57 @@
   </div>
 </div>
 
-<div class="modal-overlay hidden" id="friendsModal">
-  <div class="modal-panel">
+<div class="modal-overlay hidden" id="accountModal">
+  <div class="modal-panel account-modal-panel">
     <div class="form-header">
-      <h3>Friends</h3>
-      <button id="friendsModalCloseBtn">
+      <h3>Account</h3>
+      <button id="accountModalCloseBtn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-    <div class="friends-section-heading hidden" id="pendingFriendReqHeading">Friend requests</div>
-    <div class="pending-shares-list" id="pendingFriendReqList"></div>
 
-    <div class="friends-section-heading" id="pendingSharesHeading">Shared with you</div>
-    <div class="pending-shares-list" id="pendingSharesList"></div>
-
-    <div class="friends-section-heading">Your friends</div>
-    <div class="friend-add-row">
-      <input class="field-input" id="friendEmailInput" type="email" placeholder="Friend's email">
-      <button class="save-btn" id="addFriendBtn">Add</button>
+    <div class="account-name-row">
+      <span class="account-display-name" id="accountDisplayName"></span>
+      <input class="field-input hidden" id="nicknameInput" placeholder="Enter a nickname">
     </div>
-    <p class="auth-error hidden" id="friendError"></p>
-    <div class="friends-list" id="friendsList"></div>
+
+    <div class="account-body">
+      <div class="account-tabs">
+        <button class="account-tab-btn active" data-tab="notifications" id="notificationsTabBtn">Notifications</button>
+        <button class="account-tab-btn" data-tab="friends">Friends</button>
+        <button class="account-tab-btn" data-tab="settings">Settings</button>
+      </div>
+
+      <div class="account-tab-panels">
+        <div class="account-tab-panel" id="tab-notifications">
+          <div class="friends-section-heading hidden" id="pendingFriendReqHeading">Friend requests</div>
+          <div class="pending-shares-list" id="pendingFriendReqList"></div>
+
+          <div class="friends-section-heading" id="pendingSharesHeading">Shared with you</div>
+          <div class="pending-shares-list" id="pendingSharesList"></div>
+        </div>
+
+        <div class="account-tab-panel hidden" id="tab-friends">
+          <div class="friend-add-row">
+            <input class="field-input" id="friendEmailInput" type="email" placeholder="Friend's email">
+            <button class="save-btn" id="addFriendBtn">Add</button>
+          </div>
+          <p class="auth-error hidden" id="friendError"></p>
+          <div class="friends-list" id="friendsList"></div>
+        </div>
+
+        <div class="account-tab-panel hidden" id="tab-settings">
+          <label class="settings-toggle-row">
+            <input type="checkbox" id="hideMacrosToggle">
+            Hide macros on meal cards
+          </label>
+          <label class="settings-toggle-row">
+            <input type="checkbox" id="disableSharingToggle">
+            Disable sharing to my account
+          </label>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -199,7 +229,7 @@
 <script type="module">
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
   const EMAILJS_SERVICE_ID = 'service_1vz9m2g';
@@ -230,43 +260,29 @@
   let openShareDinnerId = null;
   let pendingShares = [];
   let pendingFriendRequests = [];
+  let nickname = null;
+  let accountSettings = { hideMacros: false, disableSharing: false };
 
-  const NOTIFY_BATCH_DELAY_MS = 5 * 60 * 1000;
-  const notifyQueues = new Map();
-
-  function queueEmailNotification(toEmail, line) {
-    if (!toEmail) return;
-    let entry = notifyQueues.get(toEmail);
-    if (!entry) {
-      entry = { items: [], timer: null };
-      notifyQueues.set(toEmail, entry);
+  function sendEmailNotification(toEmail, line) {
+    if (!toEmail) {
+      console.warn('sendEmailNotification: no recipient email, skipping');
+      return;
     }
-    entry.items.push(line);
-    if (entry.timer) clearTimeout(entry.timer);
-    entry.timer = setTimeout(() => flushEmailNotification(toEmail), NOTIFY_BATCH_DELAY_MS);
-  }
-
-  function flushEmailNotification(toEmail) {
-    const entry = notifyQueues.get(toEmail);
-    if (!entry || entry.items.length === 0) return;
-    notifyQueues.delete(toEmail);
-
-    const message = entry.items.map(line => `• ${line}`).join('\n');
+    if (typeof emailjs === 'undefined') {
+      console.error('sendEmailNotification: emailjs library is not loaded');
+      return;
+    }
+    console.log('Sending EmailJS notification to', toEmail, '-', line);
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
       to_email: toEmail,
       subject: 'Activity on The Dinner Box',
-      message,
-    }).catch(e => console.error('Could not send notification email', e));
-  }
-
-  function flushAllEmailNotificationsNow() {
-    notifyQueues.forEach((entry, toEmail) => {
-      if (entry.timer) clearTimeout(entry.timer);
-      flushEmailNotification(toEmail);
+      message: line,
+    }).then(res => {
+      console.log('EmailJS notification sent OK', res.status, res.text);
+    }).catch(e => {
+      console.error('EmailJS notification failed', e);
     });
   }
-
-  window.addEventListener('beforeunload', flushAllEmailNotificationsNow);
 
   const PROTEINS = [
     { id: 'chicken', label: 'Chicken',        color: '#B5772E', bg: '#F3E3CB' },
@@ -502,13 +518,19 @@
     dinnerDocRef = doc(db, "dinnerBox", uid);
     stopSync = onSnapshot(dinnerDocRef, (snapshot) => {
       if (snapshot.exists()) {
-        dinners = snapshot.data().dinners || [];
-        friends = snapshot.data().friends || [];
+        const data = snapshot.data();
+        dinners = data.dinners || [];
+        friends = data.friends || [];
+        nickname = data.nickname || null;
+        accountSettings = { hideMacros: false, disableSharing: false, ...(data.settings || {}) };
       } else {
         dinners = seedData;
         friends = [];
+        nickname = null;
+        accountSettings = { hideMacros: false, disableSharing: false };
         saveData();
       }
+      updateHeaderDisplayName();
       renderAll();
     }, (error) => {
       console.error('Sync error, showing local view only', error);
@@ -520,7 +542,7 @@
     stopSharedSync = onSnapshot(collection(db, "dinnerBox", uid, "shared"), (snapshot) => {
       pendingShares = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       updatePendingBadge();
-      if (!document.getElementById('friendsModal').classList.contains('hidden')) {
+      if (!document.getElementById('accountModal').classList.contains('hidden')) {
         renderPendingShares();
       }
     }, (error) => {
@@ -530,7 +552,7 @@
     stopFriendReqSync = onSnapshot(collection(db, "dinnerBox", uid, "friendRequests"), (snapshot) => {
       pendingFriendRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       updatePendingBadge();
-      if (!document.getElementById('friendsModal').classList.contains('hidden')) {
+      if (!document.getElementById('accountModal').classList.contains('hidden')) {
         renderPendingFriendRequests();
       }
     }, (error) => {
@@ -543,7 +565,7 @@
         const confirmation = change.doc.data();
         friends = friends.map(f => f.uid === confirmation.fromUid ? { ...f, status: 'accepted' } : f);
         saveFriends();
-        if (!document.getElementById('friendsModal').classList.contains('hidden')) {
+        if (!document.getElementById('accountModal').classList.contains('hidden')) {
           renderFriendsList();
         }
         deleteDoc(change.doc.ref).catch(e => console.error('Could not clear friend confirmation', e));
@@ -605,6 +627,12 @@
   async function shareDinnerWithFriend(dinner, friend) {
     if (!canShareDinnerWithFriend(dinner, friend)) return;
     try {
+      const friendUserDoc = await getDoc(doc(db, 'users', friend.uid));
+      if (friendUserDoc.exists() && friendUserDoc.data().disableSharing) {
+        alert(`${friend.email} has disabled sharing to their account.`);
+        return;
+      }
+
       const { id, sharedToUids, receivedFromUid, ...dinnerWithoutMeta } = dinner;
       await addDoc(collection(db, 'dinnerBox', friend.uid, 'shared'), {
         dinner: dinnerWithoutMeta,
@@ -615,7 +643,7 @@
         ? { ...d, sharedToUids: [...(d.sharedToUids || []), friend.uid] }
         : d);
       await saveData();
-      queueEmailNotification(friend.email, `${currentUser.email} shared "${dinner.name}" with you.`);
+      sendEmailNotification(friend.email, `${currentUser.email} shared "${dinner.name}" with you.`);
       openShareDinnerId = null;
       renderCards();
     } catch (e) {
@@ -637,6 +665,53 @@
       console.error('Could not save friends list', e);
       alert('Could not save your friends list. ' + (e.message || ''));
     });
+  }
+
+  function saveNickname() {
+    if (!dinnerDocRef) return Promise.resolve();
+    return setDoc(dinnerDocRef, { nickname }, { merge: true }).catch(e => {
+      console.error('Could not save nickname', e);
+      alert('Could not save your nickname. ' + (e.message || ''));
+    });
+  }
+
+  function saveSettings() {
+    if (!dinnerDocRef || !currentUser) return Promise.resolve();
+    const save1 = setDoc(dinnerDocRef, { settings: accountSettings }, { merge: true });
+    const save2 = setDoc(doc(db, 'users', currentUser.uid), { disableSharing: !!accountSettings.disableSharing }, { merge: true });
+    return Promise.all([save1, save2]).catch(e => {
+      console.error('Could not save settings', e);
+      alert('Could not save your settings. ' + (e.message || ''));
+    });
+  }
+
+  function computeDisplayName() {
+    if (nickname) return nickname;
+    if (!currentUser || !currentUser.email) return '';
+    const local = currentUser.email.split('@')[0];
+    const match = local.match(/^[a-zA-Z]+/);
+    const first = match ? match[0] : local;
+    return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+  }
+
+  function updateHeaderDisplayName() {
+    document.getElementById('userEmailText').textContent = computeDisplayName();
+  }
+
+  function renderAccountName() {
+    document.getElementById('accountDisplayName').textContent = computeDisplayName();
+    document.getElementById('nicknameInput').classList.add('hidden');
+    document.getElementById('accountDisplayName').classList.remove('hidden');
+  }
+
+  function switchAccountTab(tab) {
+    document.querySelectorAll('.account-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.account-tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + tab));
+  }
+
+  function renderSettingsTab() {
+    document.getElementById('hideMacrosToggle').checked = !!accountSettings.hideMacros;
+    document.getElementById('disableSharingToggle').checked = !!accountSettings.disableSharing;
   }
 
   function renderFilters() {
@@ -724,7 +799,7 @@
             <span class="meta-item">${portions ? `Serves ${portions}` : ''}</span>
           </div>
         ` : ''}
-        ${macroTotals ? `
+        ${macroTotals && !accountSettings.hideMacros ? `
           <div class="macro-row">${macroTotals.calories} kcal · ${Math.round(macroTotals.protein)}g protein · ${Math.round(macroTotals.carbs)}g carbs · ${Math.round(macroTotals.fat)}g fat${portions ? ' per portion' : ''}</div>
         ` : ''}
         <div class="toggle-row">
@@ -855,8 +930,8 @@
 
   function openForm(dinner) {
     editingId = dinner ? dinner.id : null;
-    document.getElementById('formTitle').textContent = dinner ? 'Edit dinner' : 'Add a dinner idea';
-    document.getElementById('saveBtn').textContent = dinner ? 'Save changes' : 'Add to the box';
+    document.getElementById('formTitle').textContent = dinner ? 'Edit dinner' : 'Create a meal';
+    document.getElementById('saveBtn').textContent = dinner ? 'Save changes' : 'Save Meal';
     document.getElementById('nameInput').value = dinner ? dinner.name : '';
     document.getElementById('methodInput').value = dinner ? (dinner.method || '') : '';
     document.getElementById('tempInput').value = dinner ? (dinner.temp || '') : '';
@@ -1172,13 +1247,15 @@
     renderAll();
   }
 
-  function openFriendsModal() {
+  function openAccountModal() {
     document.getElementById('friendEmailInput').value = '';
     document.getElementById('friendError').classList.add('hidden');
     renderFriendsList();
     renderPendingShares();
     renderPendingFriendRequests();
-    document.getElementById('friendsModal').classList.remove('hidden');
+    renderAccountName();
+    renderSettingsTab();
+    document.getElementById('accountModal').classList.remove('hidden');
   }
 
   function renderPendingShares() {
@@ -1213,8 +1290,8 @@
     });
   }
 
-  function closeFriendsModal() {
-    document.getElementById('friendsModal').classList.add('hidden');
+  function closeAccountModal() {
+    document.getElementById('accountModal').classList.add('hidden');
   }
 
   function renderFriendsList() {
@@ -1310,7 +1387,7 @@
         fromUid: currentUser.uid,
         fromEmail: currentUser.email,
       });
-      queueEmailNotification(email, `${currentUser.email} sent you a friend request on The Dinner Box.`);
+      sendEmailNotification(email, `${currentUser.email} sent you a friend request on The Dinner Box.`);
       document.getElementById('friendEmailInput').value = '';
       renderFriendsList();
     } catch (e) {
@@ -1424,8 +1501,48 @@
   document.getElementById('macrosModalCloseBtn').onclick = closeMacrosModal;
   document.getElementById('macrosModalCancelBtn').onclick = closeMacrosModal;
   document.getElementById('macrosModalSaveBtn').onclick = saveMacrosModal;
-  document.getElementById('userEmailLabel').onclick = openFriendsModal;
-  document.getElementById('friendsModalCloseBtn').onclick = closeFriendsModal;
+  document.getElementById('userEmailLabel').onclick = openAccountModal;
+  document.getElementById('accountModalCloseBtn').onclick = closeAccountModal;
+
+  document.querySelectorAll('.account-tab-btn').forEach(btn => {
+    btn.onclick = () => switchAccountTab(btn.dataset.tab);
+  });
+
+  document.getElementById('accountDisplayName').onclick = () => {
+    document.getElementById('accountDisplayName').classList.add('hidden');
+    const input = document.getElementById('nicknameInput');
+    input.value = nickname || '';
+    input.classList.remove('hidden');
+    input.focus();
+  };
+
+  function commitNicknameEdit() {
+    const input = document.getElementById('nicknameInput');
+    const value = input.value.trim();
+    input.classList.add('hidden');
+    document.getElementById('accountDisplayName').classList.remove('hidden');
+    if (value === (nickname || '')) return;
+    nickname = value || null;
+    saveNickname();
+    renderAccountName();
+    updateHeaderDisplayName();
+  }
+  document.getElementById('nicknameInput').addEventListener('blur', commitNicknameEdit);
+  document.getElementById('nicknameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('nicknameInput').blur();
+  });
+
+  document.getElementById('hideMacrosToggle').addEventListener('change', (e) => {
+    accountSettings.hideMacros = e.target.checked;
+    saveSettings();
+    renderCards();
+  });
+  document.getElementById('disableSharingToggle').addEventListener('change', (e) => {
+    accountSettings.disableSharing = e.target.checked;
+    saveSettings();
+    renderCards();
+  });
+
   document.getElementById('addFriendBtn').onclick = addFriendByEmail;
   document.getElementById('friendEmailInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addFriendByEmail();
@@ -1601,10 +1718,12 @@
       friends = [];
       pendingShares = [];
       pendingFriendRequests = [];
+      nickname = null;
+      accountSettings = { hideMacros: false, disableSharing: false };
       updatePendingBadge();
       editingId = null;
       document.getElementById('formWrap').classList.add('hidden');
-      document.getElementById('friendsModal').classList.add('hidden');
+      document.getElementById('accountModal').classList.add('hidden');
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
       clearAuthError();
@@ -1632,7 +1751,7 @@
     setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase() }, { merge: true })
       .catch(e => console.error('Could not update user directory entry', e));
 
-    document.getElementById('userEmailText').textContent = user.email;
+    updateHeaderDisplayName();
     clearAuthError();
     showScreen('appContent');
     startSync(user.uid);
