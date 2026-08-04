@@ -166,17 +166,18 @@
 
   <div class="myIngredients-view hidden" id="myIngredientsView">
     <div class="form-header">
-      <h3>myIngredients</h3>
+      <h3>My Ingredients</h3>
       <button class="btn-ghost" id="myIngredientsBackBtn">← Back to meals</button>
     </div>
     <p class="subtitle">Keep track of what you've got in so you know what you can cook.</p>
-    <div class="myIngredients-add-row">
-      <input class="field-input" id="myIngredientsNameInput" placeholder="Ingredient name">
-      <input class="field-input" id="myIngredientsAmountInput" type="number" min="0" step="any" placeholder="Amount">
-      <select class="field-input" id="myIngredientsUnitSelect"></select>
-      <button class="save-btn" id="myIngredientsAddBtn">Add</button>
+    <div class="ingredient-row myIngredients-add-row">
+      <input type="text" class="ing-name" id="myIngredientsNameInput" placeholder="Ingredient name">
+      <input type="number" class="ing-amount" id="myIngredientsAmountInput" min="0" step="any" placeholder="Amount">
+      <select class="ing-unit" id="myIngredientsUnitSelect"></select>
+      <select class="ing-unit" id="myIngredientsCategorySelect"></select>
+      <button type="button" class="save-btn" id="myIngredientsAddBtn">Add</button>
     </div>
-    <div class="myIngredients-list" id="myIngredientsList"></div>
+    <div class="myIngredients-sections" id="myIngredientsList"></div>
   </div>
 
   <button class="btn-primary fab-add-btn" id="addBtn">
@@ -912,11 +913,24 @@
     });
   }
 
+  const INVENTORY_CATEGORIES = [
+    { id: 'meat', label: 'Meat & fish' },
+    { id: 'dairy', label: 'Dairy & eggs' },
+    { id: 'vegetables', label: 'Vegetables' },
+    { id: 'fruit', label: 'Fruit' },
+    { id: 'dry', label: 'Dry ingredients' },
+    { id: 'spices', label: 'Spices & herbs' },
+    { id: 'sauces', label: 'Sauces & condiments' },
+    { id: 'tinned', label: 'Tinned & packet goods' },
+    { id: 'frozen', label: 'Frozen' },
+    { id: 'other', label: 'Other' },
+  ];
   function openInventoryView() {
     document.getElementById('mainMealView').classList.add('hidden');
     document.getElementById('myIngredientsView').classList.remove('hidden');
     document.getElementById('addBtn').classList.add('hidden');
     populateInventoryUnitSelect();
+    populateInventoryCategorySelect();
     renderInventoryList();
   }
 
@@ -937,30 +951,63 @@
     });
   }
 
+  function populateInventoryCategorySelect() {
+    const select = document.getElementById('myIngredientsCategorySelect');
+    if (select.options.length > 0) return;
+    INVENTORY_CATEGORIES.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.label;
+      select.appendChild(opt);
+    });
+  }
+
   function renderInventoryList() {
     const list = document.getElementById('myIngredientsList');
     list.innerHTML = '';
     if (inventory.length === 0) {
       const p = document.createElement('p');
-      p.className = 'inventory-empty';
+      p.className = 'myIngredients-empty';
       p.textContent = 'Nothing added yet.';
       list.appendChild(p);
       return;
     }
-    inventory.forEach((item, idx) => {
-      const row = document.createElement('div');
-      row.className = 'inventory-row';
-      const amt = [item.amount, item.unit].filter(Boolean).join(' ');
-      row.innerHTML = `
-        <span><span class="inventory-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="inventory-row-amount">${escapeHtml(amt)}</span>` : ''}</span>
-        <button class="remove-friend-btn">Remove</button>
-      `;
-      row.querySelector('.remove-friend-btn').onclick = () => {
-        inventory = inventory.filter((_, i) => i !== idx);
-        saveInventory();
-        renderInventoryList();
-      };
-      list.appendChild(row);
+
+    INVENTORY_CATEGORIES.forEach(cat => {
+      const itemsInCategory = inventory
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => (item.category || 'other') === cat.id);
+      if (itemsInCategory.length === 0) return;
+
+      const section = document.createElement('div');
+      section.className = 'myIngredients-section';
+
+      const heading = document.createElement('div');
+      heading.className = 'myIngredients-section-heading';
+      heading.textContent = cat.label;
+      section.appendChild(heading);
+
+      const rows = document.createElement('div');
+      rows.className = 'myIngredients-list';
+
+      itemsInCategory.forEach(({ item, idx }) => {
+        const row = document.createElement('div');
+        row.className = 'myIngredients-row';
+        const amt = [item.amount, item.unit].filter(Boolean).join(' ');
+        row.innerHTML = `
+          <span><span class="myIngredients-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="myIngredients-row-amount">${escapeHtml(amt)}</span>` : ''}</span>
+          <button class="remove-friend-btn">Remove</button>
+        `;
+        row.querySelector('.remove-friend-btn').onclick = () => {
+          inventory = inventory.filter((_, i) => i !== idx);
+          saveInventory();
+          renderInventoryList();
+        };
+        rows.appendChild(row);
+      });
+
+      section.appendChild(rows);
+      list.appendChild(section);
     });
   }
 
@@ -968,9 +1015,10 @@
     const nameInput = document.getElementById('myIngredientsNameInput');
     const amountInput = document.getElementById('myIngredientsAmountInput');
     const unitSelect = document.getElementById('myIngredientsUnitSelect');
+    const categorySelect = document.getElementById('myIngredientsCategorySelect');
     const name = nameInput.value.trim();
     if (!name) return;
-    inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value }, ...inventory];
+    inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value, category: categorySelect.value }, ...inventory];
     saveInventory();
     renderInventoryList();
     nameInput.value = '';

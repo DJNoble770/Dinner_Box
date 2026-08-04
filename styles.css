@@ -169,10 +169,28 @@ button {
 .myIngredients-view .subtitle { margin-bottom: 18px; }
 
 .myIngredients-add-row {
-  display: grid;
-  grid-template-columns: 1fr 100px 100px auto;
-  gap: 8px;
-  margin-bottom: 18px;
+  grid-template-columns: 1fr 90px 90px 150px auto;
+  margin-bottom: 22px;
+}
+.myIngredients-add-row .save-btn {
+  padding: 8px 18px;
+}
+
+.myIngredients-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.myIngredients-section-heading {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--panel-muted);
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--input-border);
+  padding-bottom: 4px;
 }
 
 .myIngredients-list {
