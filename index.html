@@ -280,6 +280,22 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="pickModal">
+  <div class="modal-panel randomiser-modal-panel">
+    <div class="form-header">
+      <h3>Tonight's pick</h3>
+      <button id="pickModalCloseBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="randomiser-body" id="pickBody"></div>
+    <div class="form-actions">
+      <button class="save-btn" id="pickAgainBtn">Pick again</button>
+      <button class="cancel-btn" id="pickModalCloseBtn2">Close</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
@@ -1102,7 +1118,7 @@
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
-    prevBtn.className = 'btn-ghost pagination-btn';
+    prevBtn.className = 'pagination-btn';
     prevBtn.textContent = '← Prev';
     prevBtn.disabled = currentPage <= 1;
     prevBtn.onclick = () => { currentPage--; renderCards(); };
@@ -1112,7 +1128,7 @@
     label.textContent = `Page ${currentPage} of ${totalPages}`;
 
     const nextBtn = document.createElement('button');
-    nextBtn.className = 'btn-ghost pagination-btn';
+    nextBtn.className = 'pagination-btn';
     nextBtn.textContent = 'Next →';
     nextBtn.disabled = currentPage >= totalPages;
     nextBtn.onclick = () => { currentPage++; renderCards(); };
@@ -1833,6 +1849,53 @@
       const el = document.getElementById('dinner-' + choice.id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 50);
+    openPickModal(choice);
+  }
+
+  function openPickModal(dinner) {
+    const body = document.getElementById('pickBody');
+    const meta = proteinMeta(dinner.protein);
+    const methodText = dinner.method ? methodLabel(dinner.method) : '';
+    const macroTotalsRaw = dinnerMacroTotals(dinner);
+    const portions = dinner.portions && dinner.portions > 0 ? dinner.portions : null;
+    const macroTotals = macroTotalsRaw && portions ? {
+      calories: macroTotalsRaw.calories / portions,
+      protein: macroTotalsRaw.protein / portions,
+      carbs: macroTotalsRaw.carbs / portions,
+      fat: macroTotalsRaw.fat / portions,
+    } : macroTotalsRaw;
+
+    const metaParts = [meta.label, methodText, dinner.time, portions ? `Serves ${portions}` : ''].filter(Boolean);
+
+    body.innerHTML = `
+      <h4 class="randomiser-result-name">${escapeHtml(dinner.name)}</h4>
+      <div class="randomiser-result-meta">${metaParts.map(escapeHtml).join(' · ')}</div>
+      ${macroTotals && !accountSettings.hideMacros ? `
+        <div class="randomiser-macro-note">≈ ${Math.round(macroTotals.calories)} kcal · ${Math.round(macroTotals.protein)}g protein · ${Math.round(macroTotals.carbs)}g carbs · ${Math.round(macroTotals.fat)}g fat${portions ? ' per portion' : ''}</div>
+      ` : ''}
+      <div class="randomiser-section-heading">Ingredients</div>
+      <div class="ing-list open">
+        ${dinner.ingredients.map(i => {
+          if (typeof i === 'string') return `<div>- ${escapeHtml(i)}</div>`;
+          const amt = [i.amount, i.unit].filter(Boolean).join(' ');
+          const state = i.state ? ` (${i.state})` : '';
+          return `<div>- ${escapeHtml(i.name)}${amt ? ` — ${escapeHtml(amt)}` : ''}${escapeHtml(state)}</div>`;
+        }).join('')}
+        ${dinner.spices && dinner.spices.length ? `
+          <div class="spice-heading">Spices</div>
+          ${dinner.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+        ` : ''}
+      </div>
+      ${dinner.steps ? `
+        <div class="randomiser-section-heading">Steps</div>
+        <div class="steps-list open">${escapeHtml(renumberStepsText(dinner.steps))}</div>
+      ` : ''}
+    `;
+    document.getElementById('pickModal').classList.remove('hidden');
+  }
+
+  function closePickModal() {
+    document.getElementById('pickModal').classList.add('hidden');
   }
 
   document.getElementById('addBtn').onclick = () => openForm(null);
@@ -1841,6 +1904,9 @@
   document.getElementById('saveBtn').onclick = handleSave;
   document.getElementById('searchInput').oninput = (e) => { searchTerm = e.target.value; currentPage = 1; renderCards(); };
   document.getElementById('pickBtn').onclick = handlePickForMe;
+  document.getElementById('pickModalCloseBtn').onclick = closePickModal;
+  document.getElementById('pickModalCloseBtn2').onclick = closePickModal;
+  document.getElementById('pickAgainBtn').onclick = handlePickForMe;
   document.getElementById('addIngredientBtn').onclick = () => addIngredientRow('', '', 'g', '');
   document.getElementById('addSpiceBtn').onclick = () => addSpiceRow('');
   document.getElementById('macrosBtn').onclick = openMacrosModal;
