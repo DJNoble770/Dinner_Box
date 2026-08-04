@@ -481,34 +481,69 @@
     return best || foods[0];
   }
 
+  const FDC_API_KEY = 'Nx3We7Na5FftKtPxrorL6upc9VBHVHQrJHuq39ZQ';
+
+  async function fetchMacrosFromOpenFoodFacts(query) {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=15`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const products = (data.products || []).filter(p => p.product_name && p.nutriments);
+    const foods = products.map(p => ({ description: p.product_name, product: p }));
+    const food = foods.length ? pickBestFood(query, foods) : null;
+    if (!food) return null;
+    const n = food.product.nutriments;
+    return {
+      calories: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0,
+      protein: n['proteins_100g'] ?? 0,
+      carbs: n['carbohydrates_100g'] ?? 0,
+      fat: n['fat_100g'] ?? 0,
+      matchedName: food.description,
+    };
+  }
+
+  async function fetchMacrosFromFdc(query) {
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${FDC_API_KEY}&query=${encodeURIComponent(query)}&pageSize=10&dataType=Foundation,SR%20Legacy`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const food = data.foods && data.foods.length ? pickBestFood(query, data.foods) : null;
+    if (!food) return null;
+    const getNutrient = (...numbers) => {
+      for (const number of numbers) {
+        const n = (food.foodNutrients || []).find(fn => String(fn.nutrientNumber) === number);
+        if (n) return n.value || 0;
+      }
+      return 0;
+    };
+    return {
+      calories: getNutrient('208', '957', '958'),
+      protein: getNutrient('203'),
+      carbs: getNutrient('205'),
+      fat: getNutrient('204'),
+      matchedName: food.description,
+    };
+  }
+
   async function fetchMacrosPer100g(name, state) {
     const cacheKey = `${name.trim().toLowerCase()}|${state || ''}`;
     if (macroLookupCache.has(cacheKey)) return macroLookupCache.get(cacheKey);
 
     const query = state ? `${name}, ${state}` : name;
-    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=15`;
 
     let result = null;
     try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const products = (data.products || []).filter(p => p.product_name && p.nutriments);
-        const foods = products.map(p => ({ description: p.product_name, product: p }));
-        const food = foods.length ? pickBestFood(query, foods) : null;
-        if (food) {
-          const n = food.product.nutriments;
-          result = {
-            calories: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0,
-            protein: n['proteins_100g'] ?? 0,
-            carbs: n['carbohydrates_100g'] ?? 0,
-            fat: n['fat_100g'] ?? 0,
-            matchedName: food.description,
-          };
-        }
-      }
+      result = await fetchMacrosFromOpenFoodFacts(query);
     } catch (e) {
-      console.error('Macro lookup failed', e);
+      console.warn('Open Food Facts lookup failed, falling back to USDA', e);
+    }
+
+    if (!result) {
+      try {
+        result = await fetchMacrosFromFdc(query);
+      } catch (e) {
+        console.error('Macro lookup failed', e);
+      }
     }
 
     macroLookupCache.set(cacheKey, result);
