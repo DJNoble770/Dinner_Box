@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"C:\\\\Users\\\\david\\\\.claude\\\\projects\\\\c--Users-david-OneDrive-Documents-Dinner-Box-main\\\\memory\" 2>&1)",
+      "Read(//c/Users/david/.claude/projects/c--Users-david-OneDrive-Documents-Dinner-Box-main/memory/**)",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command git -ErrorAction SilentlyContinue)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(git add *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(git restore *)",
+      "Bash(git reset *)",
+      "Bash(git branch *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
