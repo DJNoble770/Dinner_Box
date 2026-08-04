@@ -69,7 +69,7 @@
 
   <div class="header-row">
     <div>
-      <h1>The Main Meal</h1>
+      <h1 id="pageTitle">The Main Meal</h1>
       <p class="subtitle" id="countLabel">0 ideas on file</p>
     </div>
     <div class="header-actions">
@@ -77,6 +77,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 7l1.5 12a2 2 0 0 0 2 1.8h11a2 2 0 0 0 2-1.8L21 7M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         My Ingredients
       </button>
+      <button class="btn-ghost hidden" id="myIngredientsBackBtn">← Back to meals</button>
     </div>
   </div>
 
@@ -168,11 +169,6 @@
   </div>
 
   <div class="myIngredients-view hidden" id="myIngredientsView">
-    <div class="form-header">
-      <h3>My Ingredients</h3>
-      <button class="btn-ghost" id="myIngredientsBackBtn">← Back to meals</button>
-    </div>
-    <p class="subtitle">Keep track of what you've got in so you know what you can cook.</p>
     <div class="ingredient-row myIngredients-add-row">
       <input type="text" class="ing-name" id="myIngredientsNameInput" placeholder="Ingredient name">
       <input type="number" class="ing-amount" id="myIngredientsAmountInput" min="0" step="any" placeholder="Amount">
@@ -183,10 +179,17 @@
     <div class="myIngredients-sections" id="myIngredientsList"></div>
   </div>
 
-  <button class="btn-primary fab-add-btn" id="addBtn">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Add Meal
-  </button>
+  <div class="fab-actions">
+    <button class="btn-ghost shopping-list-btn" id="shoppingListBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Shopping list
+    </button>
+
+    <button class="btn-primary fab-add-btn" id="addBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Meal
+    </button>
+  </div>
   </div>
 </div>
 
@@ -202,6 +205,21 @@
     <div class="form-actions">
       <button class="save-btn" id="macrosModalSaveBtn">Save macros</button>
       <button class="cancel-btn" id="macrosModalCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="shoppingListModal">
+  <div class="modal-panel">
+    <div class="form-header">
+      <h3>Shopping List</h3>
+      <button id="shoppingListModalCloseBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="myIngredients-sections" id="shoppingListModalList"></div>
+    <div class="form-actions shopping-list-clear-row">
+      <button class="cancel-btn" id="shoppingListClearBtn">Clear</button>
     </div>
   </div>
 </div>
@@ -353,6 +371,7 @@
   let friends = [];
   let currentUser = null;
   let openShareDinnerId = null;
+  let openIngredientIds = new Set();
   let pendingShares = [];
   let pendingFriendRequests = [];
   let nickname = null;
@@ -925,13 +944,16 @@
     { id: 'spices', label: 'Spices & herbs' },
     { id: 'sauces', label: 'Sauces & condiments' },
     { id: 'tinned', label: 'Tinned & packet goods' },
-    { id: 'frozen', label: 'Frozen' },
     { id: 'other', label: 'Other' },
   ];
   function openInventoryView() {
     document.getElementById('mainMealView').classList.add('hidden');
     document.getElementById('myIngredientsView').classList.remove('hidden');
     document.getElementById('addBtn').classList.add('hidden');
+    document.getElementById('myIngredientsBtn').classList.add('hidden');
+    document.getElementById('myIngredientsBackBtn').classList.remove('hidden');
+    document.getElementById('pageTitle').textContent = 'My Ingredients';
+    document.getElementById('countLabel').textContent = "Keep track of what you've got in so you know what you can cook.";
     populateInventoryUnitSelect();
     populateInventoryCategorySelect();
     renderInventoryList();
@@ -941,6 +963,10 @@
     document.getElementById('myIngredientsView').classList.add('hidden');
     document.getElementById('mainMealView').classList.remove('hidden');
     document.getElementById('addBtn').classList.remove('hidden');
+    document.getElementById('myIngredientsBtn').classList.remove('hidden');
+    document.getElementById('myIngredientsBackBtn').classList.add('hidden');
+    document.getElementById('pageTitle').textContent = 'The Main Meal';
+    renderCount();
   }
 
   function populateInventoryUnitSelect() {
@@ -957,6 +983,12 @@
   function populateInventoryCategorySelect() {
     const select = document.getElementById('myIngredientsCategorySelect');
     if (select.options.length > 0) return;
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Category';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
     INVENTORY_CATEGORIES.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
@@ -965,10 +997,120 @@
     });
   }
 
+  function isIngredientInStock(name, neededAmount, neededUnit) {
+    const target = (name || '').trim().toLowerCase();
+    if (!target) return false;
+    const matches = inventory.filter(item => !item.lowStock && item.name.trim().toLowerCase() === target);
+    if (matches.length === 0) return false;
+
+    const needed = parseFloat(neededAmount);
+    if (isNaN(needed)) return true;
+
+    const sameUnitMatches = matches.filter(item => (item.unit || '') === (neededUnit || ''));
+    if (sameUnitMatches.length === 0) return true;
+
+    const have = sameUnitMatches.reduce((sum, item) => {
+      const amt = parseFloat(item.amount);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+    const anyMissingAmount = sameUnitMatches.some(item => isNaN(parseFloat(item.amount)));
+    if (anyMissingAmount) return true;
+    return have >= needed;
+  }
+
+  const CATEGORY_KEYWORDS = {
+    meat: ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'bacon', 'sausage', 'mince', 'steak', 'fish', 'salmon', 'tuna', 'prawn', 'shrimp', 'cod', 'ham'],
+    dairy: ['milk', 'cheese', 'butter', 'cream', 'yoghurt', 'yogurt', 'egg'],
+    vegetables: ['onion', 'garlic', 'carrot', 'potato', 'pepper', 'tomato', 'broccoli', 'spinach', 'mushroom', 'courgette', 'cucumber', 'lettuce', 'celery', 'leek', 'cabbage', 'sweetcorn', 'corn', 'aubergine'],
+    fruit: ['apple', 'banana', 'lemon', 'lime', 'orange', 'berry', 'berries', 'grape', 'mango', 'pineapple', 'pear', 'peach'],
+    dry: ['rice', 'pasta', 'flour', 'sugar', 'oats', 'lentil', 'lentils', 'bean', 'beans', 'noodle', 'noodles', 'quinoa', 'couscous', 'breadcrumb', 'breadcrumbs', 'spaghetti'],
+    spices: ['salt', 'pepper', 'paprika', 'cumin', 'basil', 'oregano', 'thyme', 'cinnamon', 'chilli', 'chili', 'herb', 'spice', 'turmeric', 'coriander', 'ginger', 'nutmeg', 'seasoning'],
+    sauces: ['sauce', 'ketchup', 'mayo', 'mayonnaise', 'mustard', 'vinegar', 'oil', 'stock', 'gravy', 'paste'],
+    tinned: ['tin', 'tinned', 'canned', 'can of'],
+    frozen: ['frozen'],
+  };
+  function guessInventoryCategory(name) {
+    const target = (name || '').trim().toLowerCase();
+    for (const cat of Object.keys(CATEGORY_KEYWORDS)) {
+      if (CATEGORY_KEYWORDS[cat].some(kw => target.includes(kw))) return cat;
+    }
+    return 'other';
+  }
+
+  let addedToShoppingListKeys = new Set();
+
+  function renderIngredientLine(name, amount, unit, stateText, lineKey) {
+    const amt = [amount, unit].filter(Boolean).join(' ');
+    const label = [name, amt ? `— ${amt}` : '', stateText || ''].filter(Boolean).join(' ');
+    let mark;
+    if (isIngredientInStock(name, amount, unit)) {
+      mark = ' ✓';
+    } else if (lineKey && addedToShoppingListKeys.has(lineKey)) {
+      mark = ' <span class="added-to-shopping-list-note">Item has been added to the Shopping List</span>';
+    } else {
+      mark = ` <button class="add-to-inventory-btn" data-name="${escapeHtml(name)}" data-amount="${escapeHtml(amount || '')}" data-unit="${escapeHtml(unit || '')}" data-linekey="${escapeHtml(lineKey || '')}" title="Add to My Ingredients">+</button>`;
+    }
+    return `<div>- ${escapeHtml(label)}${mark}</div>`;
+  }
+
+  function wireAddToInventoryButtons(container) {
+    container.querySelectorAll('.add-to-inventory-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        addIngredientToInventoryFromMeal(btn.dataset.name, btn.dataset.amount, btn.dataset.unit);
+        if (btn.dataset.linekey) addedToShoppingListKeys.add(btn.dataset.linekey);
+        const added = document.createElement('span');
+        added.className = 'added-to-shopping-list-note';
+        added.textContent = ' Item has been added to the Shopping List';
+        btn.replaceWith(added);
+        if (!document.getElementById('myIngredientsView').classList.contains('hidden')) {
+          renderInventoryList();
+        }
+      };
+    });
+  }
+
+  function addIngredientToInventoryFromMeal(name, amount, unit) {
+    name = (name || '').trim();
+    if (!name) return;
+    const idx = inventory.findIndex(it => it.name.trim().toLowerCase() === name.toLowerCase());
+    if (idx >= 0) {
+      inventory = inventory.map((it, i) => {
+        if (i !== idx) return it;
+        if (it.shoppingOnly) {
+          const existingAmt = parseFloat(it.amount);
+          const addedAmt = parseFloat(amount);
+          const existingFactor = UNIT_TO_GRAMS[it.unit];
+          const addedFactor = UNIT_TO_GRAMS[unit];
+          if (!isNaN(existingAmt) && !isNaN(addedAmt) && existingFactor && addedFactor) {
+            const combinedBase = existingAmt * existingFactor + addedAmt * addedFactor;
+            const combined = combinedBase / existingFactor;
+            const rounded = Math.round(combined * 1000) / 1000;
+            return { ...it, amount: String(rounded), lowStock: true };
+          }
+          if ((it.unit || '') === (unit || '') && !isNaN(existingAmt) && !isNaN(addedAmt)) {
+            return { ...it, amount: String(existingAmt + addedAmt), lowStock: true };
+          }
+          return { ...it, amount: amount || it.amount, unit: unit || it.unit, lowStock: true };
+        }
+        return { ...it, amount: amount || it.amount, unit: unit || it.unit, lowStock: true };
+      });
+    } else {
+      inventory = [{ name, amount: amount || '', unit: unit || '', category: guessInventoryCategory(name), lowStock: true, shoppingOnly: true }, ...inventory];
+    }
+    saveInventory();
+  }
+
+  const knownCategoryIds = new Set(INVENTORY_CATEGORIES.map(c => c.id));
+  function resolveCategoryId(item) {
+    return knownCategoryIds.has(item.category) ? item.category : 'other';
+  }
+
   function renderInventoryList() {
     const list = document.getElementById('myIngredientsList');
     list.innerHTML = '';
-    if (inventory.length === 0) {
+    const trackedInventory = inventory.filter(item => !item.shoppingOnly);
+    if (trackedInventory.length === 0) {
       const p = document.createElement('p');
       p.className = 'myIngredients-empty';
       p.textContent = 'Nothing added yet.';
@@ -979,7 +1121,7 @@
     INVENTORY_CATEGORIES.forEach(cat => {
       const itemsInCategory = inventory
         .map((item, idx) => ({ item, idx }))
-        .filter(({ item }) => (item.category || 'other') === cat.id);
+        .filter(({ item }) => !item.shoppingOnly && resolveCategoryId(item) === cat.id);
       if (itemsInCategory.length === 0) return;
 
       const section = document.createElement('div');
@@ -987,7 +1129,7 @@
 
       const heading = document.createElement('div');
       heading.className = 'myIngredients-section-heading';
-      heading.textContent = cat.label;
+      heading.innerHTML = `<span>${escapeHtml(cat.label)}</span><span class="myIngredients-col-header"><span class="col-label">Empty</span><button class="remove-friend-btn col-spacer" tabindex="-1">Remove</button></span>`;
       section.appendChild(heading);
 
       const rows = document.createElement('div');
@@ -996,11 +1138,18 @@
       itemsInCategory.forEach(({ item, idx }) => {
         const row = document.createElement('div');
         row.className = 'myIngredients-row';
-        const amt = [item.amount, item.unit].filter(Boolean).join(' ');
+        const amt = item.amount ? [item.amount, item.unit].filter(Boolean).join(' ') : '';
         row.innerHTML = `
           <span><span class="myIngredients-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="myIngredients-row-amount">${escapeHtml(amt)}</span>` : ''}</span>
-          <button class="remove-friend-btn">Remove</button>
+          <span class="myIngredients-row-actions">
+            <input type="checkbox" class="low-stock-check" ${item.lowStock ? 'checked' : ''}>
+            <button class="remove-friend-btn">Remove</button>
+          </span>
         `;
+        row.querySelector('.low-stock-check').onchange = (e) => {
+          inventory = inventory.map((it, i) => i === idx ? { ...it, lowStock: e.target.checked } : it);
+          saveInventory();
+        };
         row.querySelector('.remove-friend-btn').onclick = () => {
           inventory = inventory.filter((_, i) => i !== idx);
           saveInventory();
@@ -1014,6 +1163,67 @@
     });
   }
 
+  function renderShoppingList() {
+    const list = document.getElementById('shoppingListModalList');
+    list.innerHTML = '';
+    const lowItems = inventory.filter(item => item.lowStock);
+    if (lowItems.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'myIngredients-empty';
+      p.textContent = 'Nothing marked as empty or low yet.';
+      list.appendChild(p);
+      return;
+    }
+
+    INVENTORY_CATEGORIES.forEach(cat => {
+      const itemsInCategory = lowItems.filter(item => resolveCategoryId(item) === cat.id);
+      if (itemsInCategory.length === 0) return;
+
+      const section = document.createElement('div');
+      section.className = 'myIngredients-section';
+
+      const heading = document.createElement('div');
+      heading.className = 'myIngredients-section-heading';
+      heading.textContent = cat.label;
+      section.appendChild(heading);
+
+      const rows = document.createElement('div');
+      rows.className = 'myIngredients-list';
+
+      itemsInCategory.forEach(item => {
+        const amt = item.amount ? [item.amount, item.unit].filter(Boolean).join(' ') : '';
+        const row = document.createElement('div');
+        row.className = 'myIngredients-row';
+        row.innerHTML = `<span><span class="myIngredients-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="myIngredients-row-amount">${escapeHtml(amt)}</span>` : ''}</span>`;
+        rows.appendChild(row);
+      });
+
+      section.appendChild(rows);
+      list.appendChild(section);
+    });
+  }
+
+  function openShoppingListModal() {
+    renderShoppingList();
+    document.getElementById('shoppingListModal').classList.remove('hidden');
+  }
+  function closeShoppingListModal() {
+    document.getElementById('shoppingListModal').classList.add('hidden');
+  }
+
+  function clearShoppingList() {
+    inventory = inventory
+      .filter(item => !item.shoppingOnly)
+      .map(item => item.lowStock ? { ...item, lowStock: false } : item);
+    addedToShoppingListKeys.clear();
+    saveInventory();
+    renderShoppingList();
+    renderAll();
+    if (!document.getElementById('myIngredientsView').classList.contains('hidden')) {
+      renderInventoryList();
+    }
+  }
+
   function addInventoryItem() {
     const nameInput = document.getElementById('myIngredientsNameInput');
     const amountInput = document.getElementById('myIngredientsAmountInput');
@@ -1021,11 +1231,12 @@
     const categorySelect = document.getElementById('myIngredientsCategorySelect');
     const name = nameInput.value.trim();
     if (!name) return;
-    inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value, category: categorySelect.value }, ...inventory];
+    inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value, category: categorySelect.value || 'other' }, ...inventory];
     saveInventory();
     renderInventoryList();
     nameInput.value = '';
     amountInput.value = '';
+    categorySelect.value = '';
     nameInput.focus();
   }
 
@@ -1167,15 +1378,14 @@
           ` : ''}
         </div>
         <div class="ing-list">
-          ${dinner.ingredients.map(i => {
-            if (typeof i === 'string') return `<div>- ${escapeHtml(i)}</div>`;
-            const amt = [i.amount, i.unit].filter(Boolean).join(' ');
-            const state = i.state ? ` (${i.state})` : '';
-            return `<div>- ${escapeHtml(i.name)}${amt ? ` — ${escapeHtml(amt)}` : ''}${escapeHtml(state)}</div>`;
+          ${dinner.ingredients.map((i, ingIdx) => {
+            if (typeof i === 'string') return renderIngredientLine(i, null, null, '', `${dinner.id}-ing-${ingIdx}`);
+            const state = i.state ? `(${i.state})` : '';
+            return renderIngredientLine(i.name, i.amount, i.unit, state, `${dinner.id}-ing-${ingIdx}`);
           }).join('')}
           ${dinner.spices && dinner.spices.length ? `
             <div class="spice-heading">Spices</div>
-            ${dinner.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+            ${dinner.spices.map((s, spIdx) => renderIngredientLine(s, null, null, '', `${dinner.id}-sp-${spIdx}`)).join('')}
           ` : ''}
         </div>
         ${dinner.steps ? `<div class="steps-list">${escapeHtml(renumberStepsText(dinner.steps))}</div>` : ''}
@@ -1194,11 +1404,22 @@
         </div>
       `;
 
+      wireAddToInventoryButtons(card);
+
       const toggleBtn = card.querySelector('.toggle-ing');
       const ingList = card.querySelector('.ing-list');
+      if (openIngredientIds.has(dinner.id)) {
+        toggleBtn.classList.add('open');
+        ingList.classList.add('open');
+      }
       toggleBtn.onclick = () => {
         toggleBtn.classList.toggle('open');
         ingList.classList.toggle('open');
+        if (ingList.classList.contains('open')) {
+          openIngredientIds.add(dinner.id);
+        } else {
+          openIngredientIds.delete(dinner.id);
+        }
       };
 
       const toggleStepsBtn = card.querySelector('.toggle-steps');
@@ -2025,15 +2246,14 @@
       ` : ''}
       <div class="randomiser-section-heading">Ingredients</div>
       <div class="ing-list open">
-        ${dinner.ingredients.map(i => {
-          if (typeof i === 'string') return `<div>- ${escapeHtml(i)}</div>`;
-          const amt = [i.amount, i.unit].filter(Boolean).join(' ');
-          const state = i.state ? ` (${i.state})` : '';
-          return `<div>- ${escapeHtml(i.name)}${amt ? ` — ${escapeHtml(amt)}` : ''}${escapeHtml(state)}</div>`;
+        ${dinner.ingredients.map((i, ingIdx) => {
+          if (typeof i === 'string') return renderIngredientLine(i, null, null, '', `pick-${dinner.id}-ing-${ingIdx}`);
+          const state = i.state ? `(${i.state})` : '';
+          return renderIngredientLine(i.name, i.amount, i.unit, state, `pick-${dinner.id}-ing-${ingIdx}`);
         }).join('')}
         ${dinner.spices && dinner.spices.length ? `
           <div class="spice-heading">Spices</div>
-          ${dinner.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+          ${dinner.spices.map((s, spIdx) => renderIngredientLine(s, null, null, '', `pick-${dinner.id}-sp-${spIdx}`)).join('')}
         ` : ''}
       </div>
       ${dinner.steps ? `
@@ -2042,6 +2262,7 @@
       ` : ''}
     `;
     document.getElementById('pickModal').classList.remove('hidden');
+    wireAddToInventoryButtons(body);
   }
 
   function closePickModal() {
@@ -2054,6 +2275,9 @@
   document.getElementById('saveBtn').onclick = handleSave;
   document.getElementById('myIngredientsBtn').onclick = openInventoryView;
   document.getElementById('myIngredientsBackBtn').onclick = closeInventoryView;
+  document.getElementById('shoppingListBtn').onclick = openShoppingListModal;
+  document.getElementById('shoppingListModalCloseBtn').onclick = closeShoppingListModal;
+  document.getElementById('shoppingListClearBtn').onclick = clearShoppingList;
   document.getElementById('myIngredientsAddBtn').onclick = addInventoryItem;
   document.getElementById('myIngredientsAmountInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addInventoryItem();

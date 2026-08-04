@@ -161,16 +161,32 @@ button {
   align-items: center;
   gap: 6px;
 }
+.btn-primary.hidden { display: none; }
 
-.fab-add-btn {
+.fab-actions {
   position: absolute;
   bottom: 24px;
   right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 40;
+}
+
+.fab-add-btn {
   border-radius: 999px;
   padding: 14px 22px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-  z-index: 40;
 }
+.fab-add-btn.hidden { display: none; }
+
+.shopping-list-btn {
+  border-radius: 999px;
+  padding: 12px 20px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  background: var(--bg);
+}
+.shopping-list-btn.hidden { display: none; }
 
 .myIngredients-view.hidden { display: none; }
 .myIngredients-view {
@@ -179,21 +195,26 @@ button {
 .myIngredients-view .form-header { margin-bottom: 4px; }
 .myIngredients-view .subtitle { margin-bottom: 18px; }
 
-.myIngredients-add-row {
-  grid-template-columns: 1fr 90px 90px 150px auto;
+.ingredient-row.myIngredients-add-row {
+  grid-template-columns: minmax(140px, 280px) 90px 90px 150px auto;
   margin-bottom: 22px;
 }
 .myIngredients-add-row .save-btn {
-  padding: 8px 18px;
+  padding: 8px 10px;
+  font-size: 13px;
 }
 
 .myIngredients-sections {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  margin-bottom: 70px;
 }
 
 .myIngredients-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
@@ -219,6 +240,62 @@ button {
   padding: 10px 14px;
   color: var(--ink);
   font-size: 14px;
+}
+.add-to-inventory-btn {
+  background: var(--accent);
+  color: #FFFDF8;
+  border: none;
+  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  line-height: 1;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+.added-to-shopping-list-note {
+  color: var(--accent);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.myIngredients-col-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding-right: 14px;
+  font-weight: 700;
+}
+.myIngredients-col-header .col-label {
+  width: 16px;
+  text-align: center;
+  white-space: nowrap;
+}
+.myIngredients-col-header .col-spacer {
+  visibility: hidden;
+}
+.myIngredients-col-header span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--panel-muted);
+}
+.myIngredients-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.myIngredients-row-actions input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 .myIngredients-row-name { font-weight: 600; }
 .myIngredients-row-amount {
@@ -251,6 +328,7 @@ button {
   gap: 6px;
 }
 .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost.hidden { display: none; }
 
 .filters {
   margin-top: 20px;
@@ -312,6 +390,7 @@ button {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 14px;
+  align-items: start;
 }
 
 .pagination {
@@ -758,7 +837,7 @@ button {
   margin: 0;
   font-family: 'DM Serif Display', Georgia, serif;
   font-size: 20px;
-  color: var(--ink);
+  color: var(--card);
 }
 .form-header button {
   background: none;
@@ -1025,6 +1104,10 @@ label.field-label {
   display: flex;
   gap: 10px;
   margin-top: 4px;
+}
+.shopping-list-clear-row {
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 .save-btn {
   background: var(--accent);
