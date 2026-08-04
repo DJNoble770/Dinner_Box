@@ -350,6 +350,7 @@
   import { customMealIdeas } from "./meal-ideas.js";
 
   const NOTIFY_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwJ2lWNuCCTRlq4tev3Ro9CsRSpN_-96su6vWbLdC2W5uhuxYurHk8u3a50VY6bgcNx/exec';
+  const NOTIFY_SHARED_SECRET = 'af3bb73d37c18abd052073fa7ab39fca811bd2e1';
 
   // Your web app's Firebase configuration
   const firebaseConfig = {
@@ -384,6 +385,13 @@
   let inventory = [];
   let pendingGoogleCredential = null;
 
+  function deriveFirstNameFromEmail(email) {
+    const local = (email || '').split('@')[0];
+    const match = local.match(/^[a-zA-Z]+/);
+    const first = match ? match[0] : local;
+    return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : 'there';
+  }
+
   function sendEmailNotification(toEmail, line) {
     if (!toEmail) {
       console.warn('sendEmailNotification: no recipient email, skipping');
@@ -397,6 +405,7 @@
         to: toEmail,
         subject: 'Activity on The Meal Box',
         message: line,
+        secret: NOTIFY_SHARED_SECRET,
       }),
     }).then(() => {
       console.log('Notification request sent (no-cors, response not readable)');
@@ -2120,7 +2129,7 @@
         fromUid: currentUser.uid,
         fromEmail: currentUser.email,
       });
-      sendEmailNotification(email, `${currentUser.email} sent you a friend request on The Main Meal.`);
+      sendEmailNotification(email, `Hi ${deriveFirstNameFromEmail(email)},\n\n${currentUser.email} sent you a friend request on The Main Meal.`);
       document.getElementById('friendEmailInput').value = '';
       renderFriendsList();
     } catch (e) {
