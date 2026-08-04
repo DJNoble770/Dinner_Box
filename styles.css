@@ -151,6 +151,64 @@ button {
   gap: 6px;
 }
 
+.fab-add-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  border-radius: 999px;
+  padding: 14px 22px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  z-index: 40;
+}
+
+.myIngredients-view.hidden { display: none; }
+.myIngredients-view {
+  margin-top: 20px;
+}
+.myIngredients-view .form-header { margin-bottom: 4px; }
+.myIngredients-view .subtitle { margin-bottom: 18px; }
+
+.myIngredients-add-row {
+  display: grid;
+  grid-template-columns: 1fr 100px 100px auto;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.myIngredients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.myIngredients-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.myIngredients-row-name { font-weight: 600; }
+.myIngredients-row-amount {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--muted);
+  font-size: 13px;
+  margin-left: 8px;
+}
+.myIngredients-row .remove-friend-btn {
+  background: none;
+  border: none;
+  color: #A14E4E;
+  font-size: 12px;
+  padding: 0;
+}
+.myIngredients-empty {
+  color: var(--panel-muted);
+}
+
 .btn-ghost {
   background: none;
   border: 1px solid var(--input-border);
@@ -974,8 +1032,16 @@ label.field-label {
   .search-wrap { min-width: 0; }
 
   .method-row,
-  .spices-portions-row {
+  .spices-portions-row,
+  .myIngredients-add-row {
     grid-template-columns: 1fr;
+  }
+
+  .fab-add-btn {
+    bottom: 18px;
+    right: 18px;
+    padding: 12px 18px;
+    font-size: 13px;
   }
 
   .ingredient-row {

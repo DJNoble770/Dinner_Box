@@ -70,9 +70,9 @@
     <div class="header-actions">
       <button class="user-email-btn" id="userEmailLabel"><span id="userEmailText"></span></button>
       <button class="btn-ghost" id="signOutBtn">Sign out</button>
-      <button class="btn-primary" id="addBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add dinner
+      <button class="btn-primary" id="myIngredientsBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 7l1.5 12a2 2 0 0 0 2 1.8h11a2 2 0 0 0 2-1.8L21 7M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        My Ingredients
       </button>
     </div>
   </div>
@@ -142,25 +142,47 @@
     </div>
   </div>
 
-  <div class="filters" id="filterRow"></div>
+  <div id="mainMealView">
+    <div class="filters" id="filterRow"></div>
 
-  <div class="toolbar">
-    <div class="search-wrap">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A9B96" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="searchInput" placeholder="Search by name or ingredient">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A9B96" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" placeholder="Search by name or ingredient">
+      </div>
+      <button class="btn-ghost" id="pickBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+        Pick for me
+      </button>
+      <button class="btn-ghost" id="randomiserBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M8 3H3v5M16 21h5v-5M8 21H3v-5M4 4l7 7M20 4l-7 7M4 20l7-7M20 20l-7-7"/></svg>
+        Randomiser
+      </button>
     </div>
-    <button class="btn-ghost" id="pickBtn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
-      Pick for me
-    </button>
-    <button class="btn-ghost" id="randomiserBtn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M8 3H3v5M16 21h5v-5M8 21H3v-5M4 4l7 7M20 4l-7 7M4 20l7-7M20 20l-7-7"/></svg>
-      Randomiser
-    </button>
+
+    <div class="grid" id="cardGrid"></div>
+    <div class="pagination" id="paginationRow"></div>
   </div>
 
-  <div class="grid" id="cardGrid"></div>
-  <div class="pagination" id="paginationRow"></div>
+  <div class="myIngredients-view hidden" id="myIngredientsView">
+    <div class="form-header">
+      <h3>myIngredients</h3>
+      <button class="btn-ghost" id="myIngredientsBackBtn">← Back to meals</button>
+    </div>
+    <p class="subtitle">Keep track of what you've got in so you know what you can cook.</p>
+    <div class="myIngredients-add-row">
+      <input class="field-input" id="myIngredientsNameInput" placeholder="Ingredient name">
+      <input class="field-input" id="myIngredientsAmountInput" type="number" min="0" step="any" placeholder="Amount">
+      <select class="field-input" id="myIngredientsUnitSelect"></select>
+      <button class="save-btn" id="myIngredientsAddBtn">Add</button>
+    </div>
+    <div class="myIngredients-list" id="myIngredientsList"></div>
+  </div>
+
+  <button class="btn-primary fab-add-btn" id="addBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Meal
+  </button>
   </div>
 </div>
 
@@ -333,6 +355,7 @@
   let randomiserResult = null;
   let accountSettings = { hideMacros: false, disableSharing: false };
   let blockedRandomiserIds = [];
+  let myIngredients = [];
 
   function sendEmailNotification(toEmail, line) {
     if (!toEmail) {
@@ -696,6 +719,7 @@
         nickname = data.nickname || null;
         accountSettings = { hideMacros: false, disableSharing: false, ...(data.settings || {}) };
         blockedRandomiserIds = data.blockedRandomiserIds || [];
+        myIngredients = data.myIngredients || [];
 
         // One-time backfill: older accounts saved before acceptedFriendUids existed
         // won't have it yet, which would otherwise block sharing under the tightened
@@ -709,6 +733,7 @@
         nickname = null;
         accountSettings = { hideMacros: false, disableSharing: false };
         blockedRandomiserIds = [];
+        myIngredients = [];
         saveData();
       }
       updateHeaderDisplayName();
@@ -877,6 +902,80 @@
       console.error('Could not save blocked meals', e);
       alert('Could not save that block. ' + (e.message || ''));
     });
+  }
+
+  function saveInventory() {
+    if (!dinnerDocRef) return Promise.resolve();
+    return setDoc(dinnerDocRef, { inventory }, { merge: true }).catch(e => {
+      console.error('Could not save inventory', e);
+      alert('Could not save your inventory. ' + (e.message || ''));
+    });
+  }
+
+  function openInventoryView() {
+    document.getElementById('mainMealView').classList.add('hidden');
+    document.getElementById('myIngredientsView').classList.remove('hidden');
+    document.getElementById('addBtn').classList.add('hidden');
+    populateInventoryUnitSelect();
+    renderInventoryList();
+  }
+
+  function closeInventoryView() {
+    document.getElementById('myIngredientsView').classList.add('hidden');
+    document.getElementById('mainMealView').classList.remove('hidden');
+    document.getElementById('addBtn').classList.remove('hidden');
+  }
+
+  function populateInventoryUnitSelect() {
+    const select = document.getElementById('myIngredientsUnitSelect');
+    if (select.options.length > 0) return;
+    UNITS.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.textContent = u;
+      select.appendChild(opt);
+    });
+  }
+
+  function renderInventoryList() {
+    const list = document.getElementById('myIngredientsList');
+    list.innerHTML = '';
+    if (inventory.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'inventory-empty';
+      p.textContent = 'Nothing added yet.';
+      list.appendChild(p);
+      return;
+    }
+    inventory.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'inventory-row';
+      const amt = [item.amount, item.unit].filter(Boolean).join(' ');
+      row.innerHTML = `
+        <span><span class="inventory-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="inventory-row-amount">${escapeHtml(amt)}</span>` : ''}</span>
+        <button class="remove-friend-btn">Remove</button>
+      `;
+      row.querySelector('.remove-friend-btn').onclick = () => {
+        inventory = inventory.filter((_, i) => i !== idx);
+        saveInventory();
+        renderInventoryList();
+      };
+      list.appendChild(row);
+    });
+  }
+
+  function addInventoryItem() {
+    const nameInput = document.getElementById('myIngredientsNameInput');
+    const amountInput = document.getElementById('myIngredientsAmountInput');
+    const unitSelect = document.getElementById('myIngredientsUnitSelect');
+    const name = nameInput.value.trim();
+    if (!name) return;
+    inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value }, ...inventory];
+    saveInventory();
+    renderInventoryList();
+    nameInput.value = '';
+    amountInput.value = '';
+    nameInput.focus();
   }
 
   function computeDisplayName() {
@@ -1902,6 +2001,15 @@
   document.getElementById('formCloseBtn').onclick = closeForm;
   document.getElementById('cancelBtn').onclick = closeForm;
   document.getElementById('saveBtn').onclick = handleSave;
+  document.getElementById('myIngredientsBtn').onclick = openInventoryView;
+  document.getElementById('myIngredientsBackBtn').onclick = closeInventoryView;
+  document.getElementById('myIngredientsAddBtn').onclick = addInventoryItem;
+  document.getElementById('myIngredientsAmountInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addInventoryItem();
+  });
+  document.getElementById('myIngredientsNameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addInventoryItem();
+  });
   document.getElementById('searchInput').oninput = (e) => { searchTerm = e.target.value; currentPage = 1; renderCards(); };
   document.getElementById('pickBtn').onclick = handlePickForMe;
   document.getElementById('pickModalCloseBtn').onclick = closePickModal;
@@ -2148,10 +2256,14 @@
       nickname = null;
       accountSettings = { hideMacros: false, disableSharing: false };
       blockedRandomiserIds = [];
+      inventory = [];
       updatePendingBadge();
       editingId = null;
       document.getElementById('formWrap').classList.add('hidden');
       document.getElementById('accountModal').classList.add('hidden');
+      document.getElementById('myIngredientsView').classList.add('hidden');
+      document.getElementById('mainMealView').classList.remove('hidden');
+      document.getElementById('addBtn').classList.remove('hidden');
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
       clearAuthError();
