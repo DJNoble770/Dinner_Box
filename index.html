@@ -428,7 +428,6 @@
 
   const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'pinch', 'whole'];
 
-  const FDC_API_KEY = 'Nx3We7Na5FftKtPxrorL6upc9VBHVHQrJHuq39ZQ';
   const UNIT_TO_GRAMS = { g: 1, kg: 1000, ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 240, oz: 28.3495, lb: 453.592 };
   const macroLookupCache = new Map();
 
@@ -487,27 +486,23 @@
     if (macroLookupCache.has(cacheKey)) return macroLookupCache.get(cacheKey);
 
     const query = state ? `${name}, ${state}` : name;
-    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${FDC_API_KEY}&query=${encodeURIComponent(query)}&pageSize=10&dataType=Foundation,SR%20Legacy`;
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=15`;
 
     let result = null;
     try {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const food = data.foods && data.foods.length ? pickBestFood(query, data.foods) : null;
+        const products = (data.products || []).filter(p => p.product_name && p.nutriments);
+        const foods = products.map(p => ({ description: p.product_name, product: p }));
+        const food = foods.length ? pickBestFood(query, foods) : null;
         if (food) {
-          const getNutrient = (...numbers) => {
-            for (const number of numbers) {
-              const n = (food.foodNutrients || []).find(fn => String(fn.nutrientNumber) === number);
-              if (n) return n.value || 0;
-            }
-            return 0;
-          };
+          const n = food.product.nutriments;
           result = {
-            calories: getNutrient('208', '957', '958'),
-            protein: getNutrient('203'),
-            carbs: getNutrient('205'),
-            fat: getNutrient('204'),
+            calories: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0,
+            protein: n['proteins_100g'] ?? 0,
+            carbs: n['carbohydrates_100g'] ?? 0,
+            fat: n['fat_100g'] ?? 0,
             matchedName: food.description,
           };
         }
@@ -1316,6 +1311,34 @@
     return list;
   }
 
+  function updateDinnerPortions(dinnerId, newValue) {
+    const dinner = dinners.find(d => d.id === dinnerId);
+    if (!dinner) return;
+    const newPortions = Math.max(1, parseInt(newValue, 10) || dinner.portions || 1);
+    const oldPortions = dinner.portions && dinner.portions > 0 ? dinner.portions : newPortions;
+    const ratio = newPortions / oldPortions;
+
+    dinners = dinners.map(d => {
+      if (d.id !== dinnerId) return d;
+      const scaledIngredients = ratio === 1 ? d.ingredients : d.ingredients.map(ing => {
+        if (typeof ing === 'string') return ing;
+        const amt = parseFloat(ing.amount);
+        const scaledAmount = isNaN(amt) ? ing.amount : String(Math.round(amt * ratio * 100) / 100);
+        const scaledMacros = ing.macros ? {
+          calories: Math.round(ing.macros.calories * ratio),
+          protein: Math.round(ing.macros.protein * ratio * 10) / 10,
+          carbs: Math.round(ing.macros.carbs * ratio * 10) / 10,
+          fat: Math.round(ing.macros.fat * ratio * 10) / 10,
+        } : ing.macros;
+        return { ...ing, amount: scaledAmount, macros: scaledMacros };
+      });
+      return { ...d, portions: newPortions, ingredients: scaledIngredients };
+    });
+
+    saveData();
+    renderAll();
+  }
+
   function renderCards() {
     const grid = document.getElementById('cardGrid');
     grid.innerHTML = '';
@@ -1359,7 +1382,7 @@
             <span class="meta-item">${dinner.method ? escapeHtml(methodLabel(dinner.method)) : ''}</span>
             <span class="meta-item">${dinner.temp ? escapeHtml(dinner.temp) : ''}</span>
             <span class="meta-item">${dinner.time ? escapeHtml(dinner.time) : ''}</span>
-            <span class="meta-item">${portions ? `Serves ${portions}` : ''}</span>
+            <span class="meta-item portions-edit">${portions ? `Serves <input type="number" class="portions-input" min="1" step="1" value="${portions}">` : ''}</span>
           </div>
         ` : ''}
         ${macroTotals && !accountSettings.hideMacros ? `
@@ -1429,6 +1452,12 @@
           toggleStepsBtn.classList.toggle('open');
           stepsList.classList.toggle('open');
         };
+      }
+
+      const portionsInput = card.querySelector('.portions-input');
+      if (portionsInput) {
+        portionsInput.onclick = (e) => e.stopPropagation();
+        portionsInput.onchange = (e) => updateDinnerPortions(dinner.id, e.target.value);
       }
 
       card.querySelector('.edit-btn').onclick = () => openForm(dinner);
@@ -1831,7 +1860,8 @@
     const spices = getSpicesFromForm();
     const method = document.getElementById('methodInput').value;
     const temp = document.getElementById('tempInput').value.trim();
-    const time = document.getElementById('timeInput').value.trim();
+    let time = document.getElementById('timeInput').value.trim();
+    if (/^\d+(\.\d+)?$/.test(time)) time = `${time} mins`;
     const portions = parseInt(document.getElementById('portionsInput').value, 10) || null;
     const steps = document.getElementById('stepsInput').value.trim();
 

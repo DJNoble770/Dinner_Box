@@ -479,6 +479,16 @@ button {
   color: var(--muted);
 }
 .meta-item:empty { display: none; }
+.portions-input {
+  width: 34px;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--card);
+}
 
 .toggle-row {
   display: flex;
