@@ -70,7 +70,7 @@
   <div class="header-row">
     <div>
       <h1 id="pageTitle">The Main Meal</h1>
-      <p class="subtitle" id="countLabel">0 ideas on file</p>
+      <p class="subtitle" id="countLabel">0 meals on file</p>
     </div>
     <div class="header-actions">
       <button class="btn-primary" id="myIngredientsBtn">
@@ -527,6 +527,18 @@
     };
   }
 
+  function isPlausibleMacros(result) {
+    if (!result) return false;
+    const { calories, protein, carbs, fat } = result;
+    if ([calories, protein, carbs, fat].some(v => typeof v !== 'number' || isNaN(v) || v < 0)) return false;
+    // Nothing (not even pure oil) exceeds ~900 kcal/100g; catches miskeyed/garbage listings.
+    if (calories > 900) return false;
+    // Cross-check stated calories against macro-derived calories (4/4/9 kcal per gram) with slack.
+    const derived = protein * 4 + carbs * 4 + fat * 9;
+    if (derived > 50 && (calories < derived * 0.5 || calories > derived * 2)) return false;
+    return true;
+  }
+
   async function fetchMacrosPer100g(name, state) {
     const cacheKey = `${name.trim().toLowerCase()}|${state || ''}`;
     if (macroLookupCache.has(cacheKey)) return macroLookupCache.get(cacheKey);
@@ -536,6 +548,7 @@
     let result = null;
     try {
       result = await fetchMacrosFromOpenFoodFacts(query);
+      if (!isPlausibleMacros(result)) result = null;
     } catch (e) {
       console.warn('Open Food Facts lookup failed, falling back to USDA', e);
     }
@@ -543,6 +556,7 @@
     if (!result) {
       try {
         result = await fetchMacrosFromFdc(query);
+        if (!isPlausibleMacros(result)) result = null;
       } catch (e) {
         console.error('Macro lookup failed', e);
       }
@@ -672,8 +686,11 @@
       const ingredients = meal.ingredients.map(ing => ({ ...ing }));
       const macros = await estimateIngredientListMacros(ingredients);
 
-      if (filterKey === 'highProtein' && macros.protein < 40) continue;
-      if (filterKey === 'lowCalorie' && macros.calories > 600) continue;
+      const portionsForFilter = meal.portions && meal.portions > 0 ? meal.portions : 4;
+      const proteinPerPortion = macros.protein / portionsForFilter;
+      const caloriesPerPortion = macros.calories / portionsForFilter;
+      if (filterKey === 'highProtein' && proteinPerPortion < 40) continue;
+      if (filterKey === 'lowCalorie' && caloriesPerPortion > 600) continue;
 
       return { meal, ingredients, macros, totalMinutes: parseMealTimeMinutes(meal.time) };
     }
