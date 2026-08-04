@@ -22,12 +22,23 @@ body {
 }
 
 .app {
+  position: relative;
   max-width: 1000px;
   margin: 0 auto;
   background: var(--bg);
   min-height: 600px;
   padding: 28px 24px;
   border-radius: 12px;
+}
+
+.top-right-account {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 60;
 }
 
 h1 {
@@ -152,9 +163,9 @@ button {
 }
 
 .fab-add-btn {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
   border-radius: 999px;
   padding: 14px 22px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.35);
@@ -1045,6 +1056,14 @@ label.field-label {
   .header-row { align-items: stretch; }
   .header-actions { justify-content: space-between; }
   .header-actions .btn-primary { flex: 1; justify-content: center; }
+
+  .top-right-account {
+    top: 10px;
+    right: 10px;
+    gap: 6px;
+  }
+  .top-right-account .user-email-btn { font-size: 11px; }
+  .top-right-account .btn-ghost { padding: 6px 10px; font-size: 11px; }
 
   .toolbar { flex-direction: column; }
   .search-wrap { min-width: 0; }
