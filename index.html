@@ -606,7 +606,12 @@
     [/breadcrumbs?/i, 108],
     [/cocoa/i, 90],
     [/raisins?|sultanas?/i, 165],
+    [/(beans?|lentils?|chickpeas?)/i, 175],
   ];
+
+  // Recipe measures for legumes mean cooked/canned, but a plain name search tends to
+  // match dry raw product listings (~2.5x the calories) — bias the lookup accordingly.
+  const COOKED_BIAS_PATTERN = /(beans?|lentils?|chickpeas?)/i;
 
   function gramsForIngredient(ing) {
     if (ing.unit !== 'cup') return ing.amount * UNIT_TO_GRAMS[ing.unit];
@@ -621,7 +626,8 @@
     const lookups = ingredients
       .filter(ing => ing.amount && UNIT_TO_GRAMS[ing.unit])
       .map(async ing => {
-        const per100g = await fetchMacrosPer100g(ing.name, '');
+        const state = COOKED_BIAS_PATTERN.test(ing.name) ? 'cooked' : '';
+        const per100g = await fetchMacrosPer100g(ing.name, state);
         if (!per100g) return;
         const grams = gramsForIngredient(ing);
         const scale = grams / 100;
@@ -689,6 +695,11 @@
       const portionsForFilter = meal.portions && meal.portions > 0 ? meal.portions : 4;
       const proteinPerPortion = macros.protein / portionsForFilter;
       const caloriesPerPortion = macros.calories / portionsForFilter;
+      // Require at least half the ingredients to have matched before trusting the
+      // estimate for filtering — a couple of noisy matches shouldn't be able to push
+      // an otherwise-unmatched (and possibly low-protein) dish over the threshold.
+      const matchRatio = macros.totalCount > 0 ? macros.matchedCount / macros.totalCount : 0;
+      if ((filterKey === 'highProtein' || filterKey === 'lowCalorie') && matchRatio < 0.5) continue;
       if (filterKey === 'highProtein' && proteinPerPortion < 40) continue;
       if (filterKey === 'lowCalorie' && caloriesPerPortion > 600) continue;
 
@@ -1541,6 +1552,11 @@
         meals = meals.filter(d => d.id !== meal.id);
         if (pickedId === meal.id) pickedId = null;
         saveData();
+        const blockedId = meal.sourceRandomiserId || meal.id;
+        if (blockedRandomiserIds.includes(blockedId)) {
+          blockedRandomiserIds = blockedRandomiserIds.filter(id => id !== blockedId);
+          saveBlockedRandomiserIds();
+        }
         renderAll();
       };
 
@@ -2151,44 +2167,57 @@
   function renderRandomiserResult() {
     const body = document.getElementById('randomiserBody');
     if (!randomiserResult) return;
-    const { meal, ingredients } = randomiserResult;
+    const { meal } = randomiserResult;
     const meta = proteinMeta(meal.protein);
     const methodText = meal.method ? methodLabel(meal.method) : 'Method not specified';
     const timeText = randomiserResult.totalMinutes !== null ? `≈ ${randomiserResult.totalMinutes} min` : (meal.time || 'Time not specified');
+
+    document.getElementById('randomiserPortionsInput').value = meal.portions && meal.portions > 0 ? meal.portions : 4;
 
     body.innerHTML = `
       <h4 class="randomiser-result-name">${escapeHtml(meal.name)}</h4>
       <div class="randomiser-result-meta">${escapeHtml(meta.label)} · ${escapeHtml(methodText)} · ${escapeHtml(timeText)}</div>
       <div class="randomiser-macro-note" id="randomiserMacroNote"></div>
       <div class="randomiser-section-heading">Ingredients</div>
-      <div class="ing-list open">
-        ${ingredients.map(i => {
-          const amt = [i.amount, i.unit].filter(Boolean).join(' ');
-          return `<div>- ${escapeHtml(i.name)}${amt ? ` — ${escapeHtml(amt)}` : ''}</div>`;
-        }).join('')}
-        ${meal.spices && meal.spices.length ? `
-          <div class="spice-heading">Spices</div>
-          ${meal.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
-        ` : ''}
-      </div>
+      <div class="ing-list open" id="randomiserIngList"></div>
+      ${meal.spices && meal.spices.length ? `
+        <div class="spice-heading">Spices</div>
+        ${meal.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+      ` : ''}
       <div class="randomiser-section-heading">Steps</div>
       <div class="steps-list open">${escapeHtml(renumberStepsText(meal.steps || ''))}</div>
     `;
-    updateRandomiserMacroNote();
+    updateRandomiserPortions();
     document.getElementById('randomiserAddBtn').disabled = false;
     document.getElementById('randomiserBlockBtn').disabled = false;
   }
 
-  function updateRandomiserMacroNote() {
+  function updateRandomiserPortions() {
+    if (!randomiserResult) return;
+    const { meal, ingredients, macros } = randomiserResult;
+    const basePortions = meal.portions && meal.portions > 0 ? meal.portions : 4;
+    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || basePortions);
+    const ratio = portions / basePortions;
+
+    const ingList = document.getElementById('randomiserIngList');
+    if (ingList) {
+      ingList.innerHTML = ingredients.map(i => {
+        const amt = parseFloat(i.amount);
+        const scaledAmount = isNaN(amt) ? i.amount : Math.round(amt * ratio * 100) / 100;
+        const amtText = [scaledAmount, i.unit].filter(Boolean).join(' ');
+        return `<div>- ${escapeHtml(i.name)}${amtText ? ` — ${escapeHtml(amtText)}` : ''}</div>`;
+      }).join('');
+    }
+
+    randomiserResult.currentPortions = portions;
+
     const noteEl = document.getElementById('randomiserMacroNote');
-    if (!noteEl || !randomiserResult) return;
-    const { macros } = randomiserResult;
-    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || 1);
+    if (!noteEl) return;
     const per = {
-      calories: Math.round(macros.calories / portions),
-      protein: Math.round(macros.protein / portions),
-      carbs: Math.round(macros.carbs / portions),
-      fat: Math.round(macros.fat / portions),
+      calories: Math.round(macros.calories / basePortions),
+      protein: Math.round(macros.protein / basePortions),
+      carbs: Math.round(macros.carbs / basePortions),
+      fat: Math.round(macros.fat / basePortions),
     };
     noteEl.textContent = `≈ ${per.calories} kcal · ${per.protein}g protein · ${per.carbs}g carbs · ${per.fat}g fat per portion (estimated from ${macros.matchedCount}/${macros.totalCount} ingredients, ${portions} portion${portions === 1 ? '' : 's'})`;
   }
@@ -2225,14 +2254,25 @@
     if (!randomiserResult) return;
     const { meal, ingredients } = randomiserResult;
 
-    const structuredIngredients = ingredients.map(i => ({
-      name: i.name, amount: i.amount, unit: i.unit, state: '', macros: i.macros || null,
-    }));
+    const basePortions = meal.portions && meal.portions > 0 ? meal.portions : 4;
+    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || basePortions);
+    const ratio = portions / basePortions;
 
-    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || meal.portions || 4);
+    const structuredIngredients = ingredients.map(i => {
+      const amt = parseFloat(i.amount);
+      const scaledAmount = isNaN(amt) ? i.amount : Math.round(amt * ratio * 100) / 100;
+      const scaledMacros = i.macros ? {
+        calories: Math.round(i.macros.calories * ratio),
+        protein: Math.round(i.macros.protein * ratio * 10) / 10,
+        carbs: Math.round(i.macros.carbs * ratio * 10) / 10,
+        fat: Math.round(i.macros.fat * ratio * 10) / 10,
+      } : i.macros;
+      return { name: i.name, amount: scaledAmount, unit: i.unit, state: '', macros: scaledMacros || null };
+    });
 
     const newMeal = {
       id: 'meal-' + Date.now(),
+      sourceRandomiserId: meal.id,
       name: meal.name,
       protein: meal.protein,
       ingredients: structuredIngredients,
@@ -2246,6 +2286,12 @@
 
     meals = [newMeal, ...meals];
     saveData();
+
+    if (!blockedRandomiserIds.includes(meal.id)) {
+      blockedRandomiserIds = [...blockedRandomiserIds, meal.id];
+      saveBlockedRandomiserIds();
+    }
+
     renderAll();
     closeRandomiserModal();
   }
@@ -2411,7 +2457,7 @@
   document.getElementById('randomiserGoBtn').onclick = handleRandomiserGo;
   document.getElementById('randomiserAddBtn').onclick = addRandomiserResultToBox;
   document.getElementById('randomiserBlockBtn').onclick = blockCurrentRandomiserResult;
-  document.getElementById('randomiserPortionsInput').addEventListener('input', updateRandomiserMacroNote);
+  document.getElementById('randomiserPortionsInput').addEventListener('input', updateRandomiserPortions);
   document.querySelectorAll('.randomiser-filter-btn').forEach(btn => {
     btn.onclick = () => {
       randomiserFilter = btn.dataset.filter;
