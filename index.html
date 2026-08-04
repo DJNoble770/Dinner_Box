@@ -527,7 +527,7 @@
     };
   }
 
-  function isPlausibleMacros(result) {
+  function isPlausibleMacros(result, name) {
     if (!result) return false;
     const { calories, protein, carbs, fat } = result;
     if ([calories, protein, carbs, fat].some(v => typeof v !== 'number' || isNaN(v) || v < 0)) return false;
@@ -536,6 +536,9 @@
     // Cross-check stated calories against macro-derived calories (4/4/9 kcal per gram) with slack.
     const derived = protein * 4 + carbs * 4 + fat * 9;
     if (derived > 50 && (calories < derived * 0.5 || calories > derived * 2)) return false;
+    // Legume names asked for "cooked" data still often match a dry/raw listing
+    // (~20-25g protein/100g) instead of cooked (~7-10g/100g) — reject those matches.
+    if (COOKED_BIAS_PATTERN.test(name || '') && protein > 15) return false;
     return true;
   }
 
@@ -548,7 +551,7 @@
     let result = null;
     try {
       result = await fetchMacrosFromOpenFoodFacts(query);
-      if (!isPlausibleMacros(result)) result = null;
+      if (!isPlausibleMacros(result, name)) result = null;
     } catch (e) {
       console.warn('Open Food Facts lookup failed, falling back to USDA', e);
     }
@@ -556,7 +559,7 @@
     if (!result) {
       try {
         result = await fetchMacrosFromFdc(query);
-        if (!isPlausibleMacros(result)) result = null;
+        if (!isPlausibleMacros(result, name)) result = null;
       } catch (e) {
         console.error('Macro lookup failed', e);
       }
@@ -2180,10 +2183,6 @@
       <div class="randomiser-macro-note" id="randomiserMacroNote"></div>
       <div class="randomiser-section-heading">Ingredients</div>
       <div class="ing-list open" id="randomiserIngList"></div>
-      ${meal.spices && meal.spices.length ? `
-        <div class="spice-heading">Spices</div>
-        ${meal.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
-      ` : ''}
       <div class="randomiser-section-heading">Steps</div>
       <div class="steps-list open">${escapeHtml(renumberStepsText(meal.steps || ''))}</div>
     `;
@@ -2201,12 +2200,17 @@
 
     const ingList = document.getElementById('randomiserIngList');
     if (ingList) {
-      ingList.innerHTML = ingredients.map(i => {
+      const ingredientsHtml = ingredients.map(i => {
         const amt = parseFloat(i.amount);
         const scaledAmount = isNaN(amt) ? i.amount : Math.round(amt * ratio * 100) / 100;
         const amtText = [scaledAmount, i.unit].filter(Boolean).join(' ');
         return `<div>- ${escapeHtml(i.name)}${amtText ? ` — ${escapeHtml(amtText)}` : ''}</div>`;
       }).join('');
+      const spicesHtml = meal.spices && meal.spices.length ? `
+        <div class="spice-heading">Spices</div>
+        ${meal.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+      ` : '';
+      ingList.innerHTML = ingredientsHtml + spicesHtml;
     }
 
     randomiserResult.currentPortions = portions;
