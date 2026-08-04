@@ -1,4 +1,4 @@
-export const customDinnerIdeas = [
+export const customMealIdeas = [
   { id: "custom-1", name: "Honey garlic chicken thighs", protein: "chicken",
     ingredients: [{ name: "Chicken thighs", amount: "600", unit: "g" }, { name: "Honey", amount: "2", unit: "tbsp" }, { name: "Garlic", amount: "3", unit: "whole" }, { name: "Soy sauce", amount: "2", unit: "tbsp" }, { name: "Rice", amount: "300", unit: "g" }],
     spices: ["Salt", "Black pepper", "Ground ginger"], method: "oven", temp: "200C", time: "35 min", portions: 4,
@@ -84,7 +84,7 @@ export const customDinnerIdeas = [
     spices: ["Turmeric", "Cumin", "Salt"], method: "slow-cooker", temp: "Low", time: "5 hr", portions: 4,
     steps: "Add all ingredients except rice to the slow cooker.\nCook on low 5-6 hours.\nServe over rice." },
   { id: "custom-22", name: "Beef burgers with sweet potato fries", protein: "beef",
-    ingredients: [{ name: "Beef mince", amount: "500", unit: "g" }, { name: "Burger buns", amount: "4", unit: "whole" }, { name: "Sweet potatoes", amount: "600", unit: "g" }, { name: "Cheddar", amount: "4", unit: "whole" }, { name: "Lettuce", amount: "1", unit: "whole" }, { name: "Tomato", amount: "1", unit: "whole" }],
+    ingredients: [{ name: "Beef mince", amount: "500", unit: "g" }, { name: "Burger buns", amount: "4", unit: "whole" }, { name: "Sweet potato", amount: "600", unit: "g" }, { name: "Cheddar", amount: "4", unit: "whole" }, { name: "Lettuce", amount: "1", unit: "whole" }, { name: "Tomato", amount: "1", unit: "whole" }],
     spices: ["Garlic powder", "Smoked paprika", "Salt", "Black pepper"], method: "oven", temp: "220C", time: "30 min", portions: 4,
     steps: "Cut sweet potatoes into fries, toss in oil, roast 25 min.\nShape and grill/fry burgers 4-5 min each side, top with cheese.\nAssemble in buns with lettuce and tomato." },
   { id: "custom-23", name: "Pork stir fry noodles", protein: "pork",
@@ -99,7 +99,7 @@ export const customDinnerIdeas = [
     ingredients: [{ name: "Chicken breast", amount: "500", unit: "g" }, { name: "Peppers", amount: "2", unit: "whole" }, { name: "Onion", amount: "1", unit: "whole" }, { name: "Tortilla wraps", amount: "8", unit: "whole" }, { name: "Soured cream", amount: "100", unit: "ml" }],
     spices: ["Paprika", "Cumin", "Chilli powder", "Garlic powder"], method: "hob", temp: "", time: "20 min", portions: 4,
     steps: "Slice chicken and vegetables into strips.\nFry with spices until chicken is cooked through.\nServe with warm tortillas and soured cream." },
-  { id: "custom-26", name: "Roast beef Sunday dinner", protein: "beef",
+  { id: "custom-26", name: "Roast beef Sunday lunch", protein: "beef",
     ingredients: [{ name: "Beef joint", amount: "1.2", unit: "kg" }, { name: "Potatoes", amount: "800", unit: "g" }, { name: "Carrots", amount: "4", unit: "whole" }, { name: "Yorkshire pudding batter", amount: "1", unit: "whole" }, { name: "Beef stock", amount: "300", unit: "ml" }],
     spices: ["Rosemary", "Salt", "Black pepper"], method: "oven", temp: "180C", time: "90 min", portions: 6,
     steps: "Roast beef joint, resting time included, to preference.\nParboil and roast potatoes alongside.\nBoil carrots, make gravy from the stock and resting juices." },
@@ -360,7 +360,7 @@ export const customDinnerIdeas = [
     spices: ["Ground ginger", "Soy sauce"], method: "hob", temp: "", time: "25 min", portions: 4,
     steps: "Simmer beef and carrots in stock until tender.\nAdd noodles, cook until soft.\nGarnish with spring onion." },
   { id: "custom-91", name: "Vegetable quiche with side salad", protein: "other",
-    ingredients: [{ name: "Eggs", amount: "4", unit: "whole" }, { name: "Milk", amount: "150", unit: "ml" }, { name: "Peppers", amount: "1", unit: "whole" }, { name: "Cheddar", amount: "100", unit: "g" }, { name: "Shortcrust pastry", amount: "1", unit: "whole" }, { name: "Mixed salad", amount: "200", unit: "g" }],
+    ingredients: [{ name: "Egg", amount: "4", unit: "whole" }, { name: "Milk", amount: "150", unit: "ml" }, { name: "Peppers", amount: "1", unit: "whole" }, { name: "Cheddar", amount: "100", unit: "g" }, { name: "Shortcrust pastry", amount: "1", unit: "whole" }, { name: "Mixed salad", amount: "200", unit: "g" }],
     spices: ["Black pepper", "Salt"], method: "oven", temp: "180C", time: "40 min", portions: 4,
     steps: "Line a tin with pastry, blind bake 10 min.\nMix eggs, milk, peppers and cheese, pour into the case.\nBake 25-30 min until set. Serve with salad." },
   { id: "custom-92", name: "Chicken and vegetable stir fry noodles", protein: "chicken",

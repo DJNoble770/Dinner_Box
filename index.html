@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Dinner Box</title>
-<link rel="stylesheet" href="styles.css?v=20260804">
+<title>The Main Meal</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -16,7 +16,7 @@
 
   <div class="auth-screen hidden" id="authScreen">
     <h1>The Main Meal</h1>
-    <p class="subtitle">Sign in to see your own dinner box</p>
+    <p class="subtitle">Sign in to see your own meal box</p>
     <div class="auth-form">
       <input class="field-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
       <input class="field-input" id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
@@ -35,7 +35,7 @@
 
   <div class="auth-screen hidden" id="signUpScreen">
     <h1>Create account</h1>
-    <p class="subtitle">Set up your own dinner box</p>
+    <p class="subtitle">Set up your own meal box</p>
     <div class="auth-form">
       <input class="field-input" id="signUpEmail" type="email" placeholder="Email" autocomplete="email">
       <input class="field-input" id="signUpPassword" type="password" placeholder="Password" autocomplete="new-password">
@@ -81,9 +81,10 @@
     </div>
   </div>
 
-  <div class="form-wrap hidden" id="formWrap">
+  <div class="modal-overlay hidden" id="formWrap">
+   <div class="modal-panel form-modal-panel">
     <div class="form-header">
-      <h3 id="formTitle">Add a dinner idea</h3>
+      <h3 id="formTitle">Add a meal idea</h3>
       <button id="formCloseBtn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -144,6 +145,7 @@
         <button class="cancel-btn" id="cancelBtn">Cancel</button>
       </div>
     </div>
+   </div>
   </div>
 
   <div id="mainMealView">
@@ -345,7 +347,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-  import { customDinnerIdeas } from "./dinner-ideas.js";
+  import { customMealIdeas } from "./meal-ideas.js";
 
   const NOTIFY_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxpZKnTSXovzQvPZvxEqtQvq0L-WYClTqmKuXShDFr-jI9qCBGrZTMrXWO5zfueqoI/exec';
 
@@ -363,14 +365,14 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
-  let dinnerDocRef = null;
+  let mealDocRef = null;
   let stopSync = null;
   let stopSharedSync = null;
   let stopFriendReqSync = null;
   let stopFriendConfirmSync = null;
   let friends = [];
   let currentUser = null;
-  let openShareDinnerId = null;
+  let openShareMealId = null;
   let openIngredientIds = new Set();
   let pendingShares = [];
   let pendingFriendRequests = [];
@@ -391,7 +393,7 @@
       mode: 'no-cors',
       body: JSON.stringify({
         to: toEmail,
-        subject: 'Activity on The Dinner Box',
+        subject: 'Activity on The Meal Box',
         message: line,
       }),
     }).then(() => {
@@ -565,10 +567,10 @@
     };
   }
 
-  function dinnerMacroTotals(dinner) {
+  function mealMacroTotals(meal) {
     const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
     let hasAny = false;
-    (dinner.ingredients || []).forEach(i => {
+    (meal.ingredients || []).forEach(i => {
       if (i && i.macros) {
         hasAny = true;
         totals.calories += i.macros.calories || 0;
@@ -634,7 +636,7 @@
 
   const RANDOMISER_MAX_MINUTES = 60;
 
-  function parseDinnerTimeMinutes(text) {
+  function parseMealTimeMinutes(text) {
     const raw = (text || '').trim().toLowerCase();
     if (!raw) return null;
     let total = 0;
@@ -653,10 +655,10 @@
   }
 
   async function runRandomiser(filterKey, disabledMethods) {
-    const pool = customDinnerIdeas.filter(d => {
+    const pool = customMealIdeas.filter(d => {
       if (blockedRandomiserIds.includes(d.id)) return false;
       if (disabledMethods.has(d.method)) return false;
-      const minutes = parseDinnerTimeMinutes(d.time);
+      const minutes = parseMealTimeMinutes(d.time);
       if (minutes !== null && minutes > RANDOMISER_MAX_MINUTES) return false;
       if (filterKey === 'vegetarian' && d.protein !== 'other') return false;
       return true;
@@ -666,14 +668,14 @@
     const maxAttempts = Math.min(shuffled.length, 15);
 
     for (let i = 0; i < maxAttempts; i++) {
-      const dinner = shuffled[i];
-      const ingredients = dinner.ingredients.map(ing => ({ ...ing }));
+      const meal = shuffled[i];
+      const ingredients = meal.ingredients.map(ing => ({ ...ing }));
       const macros = await estimateIngredientListMacros(ingredients);
 
-      if (filterKey === 'highProtein' && macros.protein < 25) continue;
+      if (filterKey === 'highProtein' && macros.protein < 40) continue;
       if (filterKey === 'lowCalorie' && macros.calories > 600) continue;
 
-      return { dinner, ingredients, macros, totalMinutes: parseDinnerTimeMinutes(dinner.time) };
+      return { meal, ingredients, macros, totalMinutes: parseMealTimeMinutes(meal.time) };
     }
     return null;
   }
@@ -754,20 +756,20 @@
     },
   ];
 
-  let dinners = [];
+  let meals = [];
   let activeFilters = [];
-  const DINNERS_PER_PAGE = 9;
+  const MEALS_PER_PAGE = 9;
   let currentPage = 1;
   let searchTerm = '';
   let editingId = null;
   let pickedId = null;
 
   function startSync(uid) {
-    dinnerDocRef = doc(db, "dinnerBox", uid);
-    stopSync = onSnapshot(dinnerDocRef, (snapshot) => {
+    mealDocRef = doc(db, "dinnerBox", uid);
+    stopSync = onSnapshot(mealDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        dinners = data.dinners || [];
+        meals = data.dinners || [];
         friends = data.friends || [];
         nickname = data.nickname || null;
         accountSettings = { hideMacros: false, disableSharing: false, ...(data.settings || {}) };
@@ -781,7 +783,7 @@
           saveFriends();
         }
       } else {
-        dinners = seedData;
+        meals = seedData;
         friends = [];
         nickname = null;
         accountSettings = { hideMacros: false, disableSharing: false };
@@ -793,7 +795,7 @@
       renderAll();
     }, (error) => {
       console.error('Sync error, showing local view only', error);
-      dinners = seedData;
+      meals = seedData;
       friends = [];
       renderAll();
     });
@@ -849,13 +851,13 @@
   }
 
   async function acceptShare(share) {
-    const newDinner = {
-      ...share.dinner,
-      id: 'dinner-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    const newMeal = {
+      ...share.meal,
+      id: 'meal-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
       receivedFromUid: share.fromUid,
       sharedToUids: [],
     };
-    dinners = [newDinner, ...dinners];
+    meals = [newMeal, ...meals];
     await saveData();
     await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'shared', share.id)).catch(e => console.error('Could not clear shared item', e));
     renderAll();
@@ -868,8 +870,8 @@
   let pendingSave = Promise.resolve();
 
   function saveData() {
-    if (!dinnerDocRef) return Promise.resolve();
-    const p = setDoc(dinnerDocRef, { dinners }, { merge: true }).catch(e => {
+    if (!mealDocRef) return Promise.resolve();
+    const p = setDoc(mealDocRef, { dinners: meals }, { merge: true }).catch(e => {
       console.error('Could not save to the database', e);
       alert('Could not save your changes to the database — they may be lost on reload. ' + (e.message || ''));
     });
@@ -877,14 +879,14 @@
     return p;
   }
 
-  function canShareDinnerWithFriend(dinner, friend) {
-    if (dinner.receivedFromUid === friend.uid) return false;
-    if ((dinner.sharedToUids || []).includes(friend.uid)) return false;
+  function canShareMealWithFriend(meal, friend) {
+    if (meal.receivedFromUid === friend.uid) return false;
+    if ((meal.sharedToUids || []).includes(friend.uid)) return false;
     return true;
   }
 
-  async function shareDinnerWithFriend(dinner, friend) {
-    if (!canShareDinnerWithFriend(dinner, friend)) return;
+  async function shareMealWithFriend(meal, friend) {
+    if (!canShareMealWithFriend(meal, friend)) return;
     try {
       const friendUserDoc = await getDoc(doc(db, 'users', friend.uid));
       if (friendUserDoc.exists() && friendUserDoc.data().disableSharing) {
@@ -892,56 +894,56 @@
         return;
       }
 
-      const { id, sharedToUids, receivedFromUid, ...dinnerWithoutMeta } = dinner;
+      const { id, sharedToUids, receivedFromUid, ...mealWithoutMeta } = meal;
       await addDoc(collection(db, 'dinnerBox', friend.uid, 'shared'), {
-        dinner: dinnerWithoutMeta,
+        meal: mealWithoutMeta,
         fromEmail: currentUser ? currentUser.email : '',
         fromUid: currentUser ? currentUser.uid : '',
       });
-      dinners = dinners.map(d => d.id === dinner.id
+      meals = meals.map(d => d.id === meal.id
         ? { ...d, sharedToUids: [...(d.sharedToUids || []), friend.uid] }
         : d);
       await saveData();
-      sendEmailNotification(friend.email, `${currentUser.email} shared "${dinner.name}" with you.`);
-      openShareDinnerId = null;
+      sendEmailNotification(friend.email, `${currentUser.email} shared "${meal.name}" with you.`);
+      openShareMealId = null;
       renderCards();
     } catch (e) {
-      console.error('Could not share dinner', e);
-      alert('Could not share this dinner. ' + (e.message || ''));
+      console.error('Could not share meal', e);
+      alert('Could not share this meal. ' + (e.message || ''));
     }
   }
 
   document.addEventListener('click', () => {
-    if (openShareDinnerId !== null) {
-      openShareDinnerId = null;
+    if (openShareMealId !== null) {
+      openShareMealId = null;
       renderCards();
     }
   });
 
   function saveFriends() {
-    if (!dinnerDocRef) return Promise.resolve();
+    if (!mealDocRef) return Promise.resolve();
     // acceptedFriendUids is a plain scalar array mirroring the accepted subset of
     // `friends` — kept alongside it purely so Firestore security rules can check
     // "is this sender actually my accepted friend?" with a simple array-contains
     // check, since rules can't easily search an array of objects by field.
     const acceptedFriendUids = friends.filter(f => f.status === 'accepted').map(f => f.uid);
-    return setDoc(dinnerDocRef, { friends, acceptedFriendUids }, { merge: true }).catch(e => {
+    return setDoc(mealDocRef, { friends, acceptedFriendUids }, { merge: true }).catch(e => {
       console.error('Could not save friends list', e);
       alert('Could not save your friends list. ' + (e.message || ''));
     });
   }
 
   function saveNickname() {
-    if (!dinnerDocRef) return Promise.resolve();
-    return setDoc(dinnerDocRef, { nickname }, { merge: true }).catch(e => {
+    if (!mealDocRef) return Promise.resolve();
+    return setDoc(mealDocRef, { nickname }, { merge: true }).catch(e => {
       console.error('Could not save nickname', e);
       alert('Could not save your nickname. ' + (e.message || ''));
     });
   }
 
   function saveSettings() {
-    if (!dinnerDocRef || !currentUser) return Promise.resolve();
-    const save1 = setDoc(dinnerDocRef, { settings: accountSettings }, { merge: true });
+    if (!mealDocRef || !currentUser) return Promise.resolve();
+    const save1 = setDoc(mealDocRef, { settings: accountSettings }, { merge: true });
     const save2 = setDoc(doc(db, 'users', currentUser.uid), { disableSharing: !!accountSettings.disableSharing }, { merge: true });
     return Promise.all([save1, save2]).catch(e => {
       console.error('Could not save settings', e);
@@ -950,16 +952,16 @@
   }
 
   function saveBlockedRandomiserIds() {
-    if (!dinnerDocRef) return Promise.resolve();
-    return setDoc(dinnerDocRef, { blockedRandomiserIds }, { merge: true }).catch(e => {
+    if (!mealDocRef) return Promise.resolve();
+    return setDoc(mealDocRef, { blockedRandomiserIds }, { merge: true }).catch(e => {
       console.error('Could not save blocked meals', e);
       alert('Could not save that block. ' + (e.message || ''));
     });
   }
 
   function saveInventory() {
-    if (!dinnerDocRef) return Promise.resolve();
-    return setDoc(dinnerDocRef, { inventory }, { merge: true }).catch(e => {
+    if (!mealDocRef) return Promise.resolve();
+    return setDoc(mealDocRef, { inventory }, { merge: true }).catch(e => {
       console.error('Could not save inventory', e);
       alert('Could not save your inventory. ' + (e.message || ''));
     });
@@ -1196,7 +1198,9 @@
   function renderShoppingList() {
     const list = document.getElementById('shoppingListModalList');
     list.innerHTML = '';
-    const lowItems = inventory.filter(item => item.lowStock);
+    const lowItems = inventory
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item }) => item.lowStock);
     if (lowItems.length === 0) {
       const p = document.createElement('p');
       p.className = 'myIngredients-empty';
@@ -1206,7 +1210,7 @@
     }
 
     INVENTORY_CATEGORIES.forEach(cat => {
-      const itemsInCategory = lowItems.filter(item => resolveCategoryId(item) === cat.id);
+      const itemsInCategory = lowItems.filter(({ item }) => resolveCategoryId(item) === cat.id);
       if (itemsInCategory.length === 0) return;
 
       const section = document.createElement('div');
@@ -1220,11 +1224,27 @@
       const rows = document.createElement('div');
       rows.className = 'myIngredients-list';
 
-      itemsInCategory.forEach(item => {
+      itemsInCategory.forEach(({ item, idx }) => {
         const amt = item.amount ? [item.amount, item.unit].filter(Boolean).join(' ') : '';
         const row = document.createElement('div');
         row.className = 'myIngredients-row';
-        row.innerHTML = `<span><span class="myIngredients-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="myIngredients-row-amount">${escapeHtml(amt)}</span>` : ''}</span>`;
+        row.innerHTML = `
+          <span><span class="myIngredients-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="myIngredients-row-amount">${escapeHtml(amt)}</span>` : ''}</span>
+          <button class="shopping-list-remove-btn" title="Remove from shopping list">×</button>
+        `;
+        row.querySelector('.shopping-list-remove-btn').onclick = () => {
+          const target = inventory[idx];
+          if (target.shoppingOnly) {
+            inventory = inventory.filter((_, i) => i !== idx);
+          } else {
+            inventory = inventory.map((it, i) => i === idx ? { ...it, lowStock: false } : it);
+          }
+          saveInventory();
+          renderShoppingList();
+          if (!document.getElementById('myIngredientsView').classList.contains('hidden')) {
+            renderInventoryList();
+          }
+        };
         rows.appendChild(row);
       });
 
@@ -1331,7 +1351,7 @@
   }
 
   function getFiltered() {
-    let list = dinners;
+    let list = meals;
     if (activeFilters.length > 0) {
       list = list.filter(d => activeFilters.includes(d.protein));
     }
@@ -1346,15 +1366,15 @@
     return list;
   }
 
-  function updateDinnerPortions(dinnerId, newValue) {
-    const dinner = dinners.find(d => d.id === dinnerId);
-    if (!dinner) return;
-    const newPortions = Math.max(1, parseInt(newValue, 10) || dinner.portions || 1);
-    const oldPortions = dinner.portions && dinner.portions > 0 ? dinner.portions : newPortions;
+  function updateMealPortions(mealId, newValue) {
+    const meal = meals.find(d => d.id === mealId);
+    if (!meal) return;
+    const newPortions = Math.max(1, parseInt(newValue, 10) || meal.portions || 1);
+    const oldPortions = meal.portions && meal.portions > 0 ? meal.portions : newPortions;
     const ratio = newPortions / oldPortions;
 
-    dinners = dinners.map(d => {
-      if (d.id !== dinnerId) return d;
+    meals = meals.map(d => {
+      if (d.id !== mealId) return d;
       const scaledIngredients = ratio === 1 ? d.ingredients : d.ingredients.map(ing => {
         if (typeof ing === 'string') return ing;
         const amt = parseFloat(ing.amount);
@@ -1382,22 +1402,22 @@
     if (filtered.length === 0) {
       const msg = document.createElement('p');
       msg.className = 'empty-msg';
-      msg.textContent = 'Nothing matches yet. Try a different filter, or add a new dinner idea.';
+      msg.textContent = 'Nothing matches yet. Try a different filter, or add a new meal idea.';
       grid.appendChild(msg);
       renderPagination(0);
       return;
     }
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / DINNERS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil(filtered.length / MEALS_PER_PAGE));
     if (currentPage > totalPages) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
-    const startIdx = (currentPage - 1) * DINNERS_PER_PAGE;
-    const pageItems = filtered.slice(startIdx, startIdx + DINNERS_PER_PAGE);
+    const startIdx = (currentPage - 1) * MEALS_PER_PAGE;
+    const pageItems = filtered.slice(startIdx, startIdx + MEALS_PER_PAGE);
 
-    pageItems.forEach(dinner => {
-      const meta = proteinMeta(dinner.protein);
-      const macroTotalsRaw = dinnerMacroTotals(dinner);
-      const portions = dinner.portions && dinner.portions > 0 ? dinner.portions : null;
+    pageItems.forEach(meal => {
+      const meta = proteinMeta(meal.protein);
+      const macroTotalsRaw = mealMacroTotals(meal);
+      const portions = meal.portions && meal.portions > 0 ? meal.portions : null;
       const macroTotals = macroTotalsRaw && portions ? {
         calories: Math.round(macroTotalsRaw.calories / portions),
         protein: macroTotalsRaw.protein / portions,
@@ -1405,18 +1425,18 @@
         fat: macroTotalsRaw.fat / portions,
       } : macroTotalsRaw;
       const card = document.createElement('div');
-      card.className = 'card' + (pickedId === dinner.id ? ' picked' : '');
-      card.id = 'dinner-' + dinner.id;
+      card.className = 'card' + (pickedId === meal.id ? ' picked' : '');
+      card.id = 'meal-' + meal.id;
 
       card.innerHTML = `
         <div class="dot" style="background:${meta.color}"></div>
         <div class="protein-label" style="color:${meta.color}">${meta.label}</div>
-        <h4>${escapeHtml(dinner.name)}</h4>
-        ${(dinner.method || dinner.temp || dinner.time || portions) ? `
+        <h4>${escapeHtml(meal.name)}</h4>
+        ${(meal.method || meal.temp || meal.time || portions) ? `
           <div class="meta-row">
-            <span class="meta-item">${dinner.method ? escapeHtml(methodLabel(dinner.method)) : ''}</span>
-            <span class="meta-item">${dinner.temp ? escapeHtml(dinner.temp) : ''}</span>
-            <span class="meta-item">${dinner.time ? escapeHtml(dinner.time) : ''}</span>
+            <span class="meta-item">${meal.method ? escapeHtml(methodLabel(meal.method)) : ''}</span>
+            <span class="meta-item">${meal.temp ? escapeHtml(meal.temp) : ''}</span>
+            <span class="meta-item">${meal.time ? escapeHtml(meal.time) : ''}</span>
             <span class="meta-item portions-edit">${portions ? `Serves <input type="number" class="portions-input" min="1" step="1" value="${portions}">` : ''}</span>
           </div>
         ` : ''}
@@ -1425,10 +1445,10 @@
         ` : ''}
         <div class="toggle-row">
           <button class="toggle-ing">
-            Ingredients (${dinner.ingredients.length + (dinner.spices ? dinner.spices.length : 0)})
+            Ingredients (${meal.ingredients.length + (meal.spices ? meal.spices.length : 0)})
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-          ${dinner.steps ? `
+          ${meal.steps ? `
             <button class="toggle-steps">
               Steps
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1436,17 +1456,17 @@
           ` : ''}
         </div>
         <div class="ing-list">
-          ${dinner.ingredients.map((i, ingIdx) => {
-            if (typeof i === 'string') return renderIngredientLine(i, null, null, '', `${dinner.id}-ing-${ingIdx}`);
+          ${meal.ingredients.map((i, ingIdx) => {
+            if (typeof i === 'string') return renderIngredientLine(i, null, null, '', `${meal.id}-ing-${ingIdx}`);
             const state = i.state ? `(${i.state})` : '';
-            return renderIngredientLine(i.name, i.amount, i.unit, state, `${dinner.id}-ing-${ingIdx}`);
+            return renderIngredientLine(i.name, i.amount, i.unit, state, `${meal.id}-ing-${ingIdx}`);
           }).join('')}
-          ${dinner.spices && dinner.spices.length ? `
+          ${meal.spices && meal.spices.length ? `
             <div class="spice-heading">Spices</div>
-            ${dinner.spices.map((s, spIdx) => renderIngredientLine(s, null, null, '', `${dinner.id}-sp-${spIdx}`)).join('')}
+            ${meal.spices.map((s, spIdx) => renderIngredientLine(s, null, null, '', `${meal.id}-sp-${spIdx}`)).join('')}
           ` : ''}
         </div>
-        ${dinner.steps ? `<div class="steps-list">${escapeHtml(renumberStepsText(dinner.steps))}</div>` : ''}
+        ${meal.steps ? `<div class="steps-list">${escapeHtml(renumberStepsText(meal.steps))}</div>` : ''}
         <div class="card-actions">
           <button class="edit-btn">Edit</button>
           <button class="del-btn">
@@ -1466,7 +1486,7 @@
 
       const toggleBtn = card.querySelector('.toggle-ing');
       const ingList = card.querySelector('.ing-list');
-      if (openIngredientIds.has(dinner.id)) {
+      if (openIngredientIds.has(meal.id)) {
         toggleBtn.classList.add('open');
         ingList.classList.add('open');
       }
@@ -1474,9 +1494,9 @@
         toggleBtn.classList.toggle('open');
         ingList.classList.toggle('open');
         if (ingList.classList.contains('open')) {
-          openIngredientIds.add(dinner.id);
+          openIngredientIds.add(meal.id);
         } else {
-          openIngredientIds.delete(dinner.id);
+          openIngredientIds.delete(meal.id);
         }
       };
 
@@ -1492,13 +1512,13 @@
       const portionsInput = card.querySelector('.portions-input');
       if (portionsInput) {
         portionsInput.onclick = (e) => e.stopPropagation();
-        portionsInput.onchange = (e) => updateDinnerPortions(dinner.id, e.target.value);
+        portionsInput.onchange = (e) => updateMealPortions(meal.id, e.target.value);
       }
 
-      card.querySelector('.edit-btn').onclick = () => openForm(dinner);
+      card.querySelector('.edit-btn').onclick = () => openForm(meal);
       card.querySelector('.del-btn').onclick = () => {
-        dinners = dinners.filter(d => d.id !== dinner.id);
-        if (pickedId === dinner.id) pickedId = null;
+        meals = meals.filter(d => d.id !== meal.id);
+        if (pickedId === meal.id) pickedId = null;
         saveData();
         renderAll();
       };
@@ -1507,11 +1527,11 @@
       const sharePopover = card.querySelector('.share-popover');
       shareBtn.onclick = (e) => {
         e.stopPropagation();
-        const willOpen = openShareDinnerId !== dinner.id;
-        openShareDinnerId = willOpen ? dinner.id : null;
+        const willOpen = openShareMealId !== meal.id;
+        openShareMealId = willOpen ? meal.id : null;
         renderCards();
       };
-      if (openShareDinnerId === dinner.id) {
+      if (openShareMealId === meal.id) {
         sharePopover.classList.remove('hidden');
         sharePopover.innerHTML = '';
         const confirmedFriends = friends.filter(f => f.status === 'accepted');
@@ -1523,16 +1543,16 @@
         } else {
           confirmedFriends.forEach(f => {
             const btn = document.createElement('button');
-            const allowed = canShareDinnerWithFriend(dinner, f);
+            const allowed = canShareMealWithFriend(meal, f);
             if (!allowed) {
               btn.disabled = true;
-              btn.title = dinner.receivedFromUid === f.uid ? "Can't share back to who sent it to you" : 'Already shared with them';
+              btn.title = meal.receivedFromUid === f.uid ? "Can't share back to who sent it to you" : 'Already shared with them';
               btn.textContent = `${f.email} ✓`;
             } else {
               btn.textContent = f.email;
               btn.onclick = (e) => {
                 e.stopPropagation();
-                shareDinnerWithFriend(dinner, f);
+                shareMealWithFriend(meal, f);
               };
             }
             sharePopover.appendChild(btn);
@@ -1549,7 +1569,7 @@
   function renderPagination(totalCount) {
     const row = document.getElementById('paginationRow');
     row.innerHTML = '';
-    const totalPages = Math.max(1, Math.ceil(totalCount / DINNERS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil(totalCount / MEALS_PER_PAGE));
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
@@ -1585,7 +1605,7 @@
 
   function renderCount() {
     document.getElementById('countLabel').textContent =
-      `${dinners.length} idea${dinners.length !== 1 ? 's' : ''} on file`;
+      `${meals.length} idea${meals.length !== 1 ? 's' : ''} on file`;
   }
 
   function renderAll() {
@@ -1594,18 +1614,18 @@
     renderCount();
   }
 
-  function openForm(dinner) {
-    editingId = dinner ? dinner.id : null;
-    document.getElementById('formTitle').textContent = dinner ? 'Edit dinner' : 'Create a meal';
-    document.getElementById('saveBtn').textContent = dinner ? 'Save changes' : 'Save Meal';
-    document.getElementById('nameInput').value = dinner ? dinner.name : '';
-    document.getElementById('methodInput').value = dinner ? (dinner.method || '') : '';
-    document.getElementById('tempInput').value = dinner ? (dinner.temp || '') : '';
-    document.getElementById('timeInput').value = dinner ? (dinner.time || '') : '';
-    document.getElementById('portionsInput').value = dinner ? (dinner.portions || '') : '';
-    document.getElementById('stepsInput').value = dinner ? renumberStepsText(dinner.steps || '') : '';
-    renderIngredientRows(dinner ? dinner.ingredients : []);
-    renderSpiceRows(dinner ? dinner.spices : []);
+  function openForm(meal) {
+    editingId = meal ? meal.id : null;
+    document.getElementById('formTitle').textContent = meal ? 'Edit meal' : 'Create a meal';
+    document.getElementById('saveBtn').textContent = meal ? 'Save changes' : 'Save Meal';
+    document.getElementById('nameInput').value = meal ? meal.name : '';
+    document.getElementById('methodInput').value = meal ? (meal.method || '') : '';
+    document.getElementById('tempInput').value = meal ? (meal.temp || '') : '';
+    document.getElementById('timeInput').value = meal ? (meal.time || '') : '';
+    document.getElementById('portionsInput').value = meal ? (meal.portions || '') : '';
+    document.getElementById('stepsInput').value = meal ? renumberStepsText(meal.steps || '') : '';
+    renderIngredientRows(meal ? meal.ingredients : []);
+    renderSpiceRows(meal ? meal.spices : []);
     document.getElementById('formWrap').classList.remove('hidden');
   }
 
@@ -1903,11 +1923,11 @@
     const protein = detectProteinFromName(name);
 
     if (editingId) {
-      dinners = dinners.map(d => d.id === editingId
+      meals = meals.map(d => d.id === editingId
         ? { ...d, name, protein, ingredients, spices, method, temp, time, portions, steps }
         : d);
     } else {
-      dinners = [{ id: 'dinner-' + Date.now(), name, protein, ingredients, spices, method, temp, time, portions, steps }, ...dinners];
+      meals = [{ id: 'meal-' + Date.now(), name, protein, ingredients, spices, method, temp, time, portions, steps }, ...meals];
     }
     saveData();
     closeForm();
@@ -1943,7 +1963,7 @@
       row.className = 'pending-share-row';
       row.innerHTML = `
         <div class="pending-share-info">
-          <span class="pending-share-name">${escapeHtml(share.dinner ? share.dinner.name : 'Unknown dish')}</span>
+          <span class="pending-share-name">${escapeHtml(share.meal ? share.meal.name : 'Unknown dish')}</span>
           <span class="pending-share-from">from ${escapeHtml(share.fromEmail || 'a friend')}</span>
         </div>
         <div class="pending-share-actions">
@@ -2054,7 +2074,7 @@
         fromUid: currentUser.uid,
         fromEmail: currentUser.email,
       });
-      sendEmailNotification(email, `${currentUser.email} sent you a friend request on The Dinner Box.`);
+      sendEmailNotification(email, `${currentUser.email} sent you a friend request on The Main Meal.`);
       document.getElementById('friendEmailInput').value = '';
       renderFriendsList();
     } catch (e) {
@@ -2092,15 +2112,15 @@
 
   function blockCurrentRandomiserResult() {
     if (!randomiserResult) return;
-    const { dinner } = randomiserResult;
-    if (!blockedRandomiserIds.includes(dinner.id)) {
-      blockedRandomiserIds = [...blockedRandomiserIds, dinner.id];
+    const { meal } = randomiserResult;
+    if (!blockedRandomiserIds.includes(meal.id)) {
+      blockedRandomiserIds = [...blockedRandomiserIds, meal.id];
       saveBlockedRandomiserIds();
     }
     randomiserResult = null;
     document.getElementById('randomiserAddBtn').disabled = true;
     document.getElementById('randomiserBlockBtn').disabled = true;
-    document.getElementById('randomiserBody').innerHTML = `<p class="randomiser-placeholder">"${escapeHtml(dinner.name)}" won't be suggested to you again. Hit "Randomise" for another.</p>`;
+    document.getElementById('randomiserBody').innerHTML = `<p class="randomiser-placeholder">"${escapeHtml(meal.name)}" won't be suggested to you again. Hit "Randomise" for another.</p>`;
   }
 
   function closeRandomiserModal() {
@@ -2110,13 +2130,13 @@
   function renderRandomiserResult() {
     const body = document.getElementById('randomiserBody');
     if (!randomiserResult) return;
-    const { dinner, ingredients } = randomiserResult;
-    const meta = proteinMeta(dinner.protein);
-    const methodText = dinner.method ? methodLabel(dinner.method) : 'Method not specified';
-    const timeText = randomiserResult.totalMinutes !== null ? `≈ ${randomiserResult.totalMinutes} min` : (dinner.time || 'Time not specified');
+    const { meal, ingredients } = randomiserResult;
+    const meta = proteinMeta(meal.protein);
+    const methodText = meal.method ? methodLabel(meal.method) : 'Method not specified';
+    const timeText = randomiserResult.totalMinutes !== null ? `≈ ${randomiserResult.totalMinutes} min` : (meal.time || 'Time not specified');
 
     body.innerHTML = `
-      <h4 class="randomiser-result-name">${escapeHtml(dinner.name)}</h4>
+      <h4 class="randomiser-result-name">${escapeHtml(meal.name)}</h4>
       <div class="randomiser-result-meta">${escapeHtml(meta.label)} · ${escapeHtml(methodText)} · ${escapeHtml(timeText)}</div>
       <div class="randomiser-macro-note" id="randomiserMacroNote"></div>
       <div class="randomiser-section-heading">Ingredients</div>
@@ -2125,13 +2145,13 @@
           const amt = [i.amount, i.unit].filter(Boolean).join(' ');
           return `<div>- ${escapeHtml(i.name)}${amt ? ` — ${escapeHtml(amt)}` : ''}</div>`;
         }).join('')}
-        ${dinner.spices && dinner.spices.length ? `
+        ${meal.spices && meal.spices.length ? `
           <div class="spice-heading">Spices</div>
-          ${dinner.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+          ${meal.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
         ` : ''}
       </div>
       <div class="randomiser-section-heading">Steps</div>
-      <div class="steps-list open">${escapeHtml(renumberStepsText(dinner.steps || ''))}</div>
+      <div class="steps-list open">${escapeHtml(renumberStepsText(meal.steps || ''))}</div>
     `;
     updateRandomiserMacroNote();
     document.getElementById('randomiserAddBtn').disabled = false;
@@ -2182,28 +2202,28 @@
 
   function addRandomiserResultToBox() {
     if (!randomiserResult) return;
-    const { dinner, ingredients } = randomiserResult;
+    const { meal, ingredients } = randomiserResult;
 
     const structuredIngredients = ingredients.map(i => ({
       name: i.name, amount: i.amount, unit: i.unit, state: '', macros: i.macros || null,
     }));
 
-    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || dinner.portions || 4);
+    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || meal.portions || 4);
 
-    const newDinner = {
-      id: 'dinner-' + Date.now(),
-      name: dinner.name,
-      protein: dinner.protein,
+    const newMeal = {
+      id: 'meal-' + Date.now(),
+      name: meal.name,
+      protein: meal.protein,
       ingredients: structuredIngredients,
-      spices: [...(dinner.spices || [])],
-      method: dinner.method || '',
-      temp: dinner.temp || '',
-      time: dinner.time || '',
+      spices: [...(meal.spices || [])],
+      method: meal.method || '',
+      temp: meal.temp || '',
+      time: meal.time || '',
       portions,
-      steps: dinner.steps || '',
+      steps: meal.steps || '',
     };
 
-    dinners = [newDinner, ...dinners];
+    meals = [newMeal, ...meals];
     saveData();
     renderAll();
     closeRandomiserModal();
@@ -2279,21 +2299,21 @@
     const index = Math.floor(Math.random() * filtered.length);
     const choice = filtered[index];
     pickedId = choice.id;
-    currentPage = Math.floor(index / DINNERS_PER_PAGE) + 1;
+    currentPage = Math.floor(index / MEALS_PER_PAGE) + 1;
     renderCards();
     setTimeout(() => {
-      const el = document.getElementById('dinner-' + choice.id);
+      const el = document.getElementById('meal-' + choice.id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 50);
     openPickModal(choice);
   }
 
-  function openPickModal(dinner) {
+  function openPickModal(meal) {
     const body = document.getElementById('pickBody');
-    const meta = proteinMeta(dinner.protein);
-    const methodText = dinner.method ? methodLabel(dinner.method) : '';
-    const macroTotalsRaw = dinnerMacroTotals(dinner);
-    const portions = dinner.portions && dinner.portions > 0 ? dinner.portions : null;
+    const meta = proteinMeta(meal.protein);
+    const methodText = meal.method ? methodLabel(meal.method) : '';
+    const macroTotalsRaw = mealMacroTotals(meal);
+    const portions = meal.portions && meal.portions > 0 ? meal.portions : null;
     const macroTotals = macroTotalsRaw && portions ? {
       calories: macroTotalsRaw.calories / portions,
       protein: macroTotalsRaw.protein / portions,
@@ -2301,29 +2321,29 @@
       fat: macroTotalsRaw.fat / portions,
     } : macroTotalsRaw;
 
-    const metaParts = [meta.label, methodText, dinner.time, portions ? `Serves ${portions}` : ''].filter(Boolean);
+    const metaParts = [meta.label, methodText, meal.time, portions ? `Serves ${portions}` : ''].filter(Boolean);
 
     body.innerHTML = `
-      <h4 class="randomiser-result-name">${escapeHtml(dinner.name)}</h4>
+      <h4 class="randomiser-result-name">${escapeHtml(meal.name)}</h4>
       <div class="randomiser-result-meta">${metaParts.map(escapeHtml).join(' · ')}</div>
       ${macroTotals && !accountSettings.hideMacros ? `
         <div class="randomiser-macro-note">≈ ${Math.round(macroTotals.calories)} kcal · ${Math.round(macroTotals.protein)}g protein · ${Math.round(macroTotals.carbs)}g carbs · ${Math.round(macroTotals.fat)}g fat${portions ? ' per portion' : ''}</div>
       ` : ''}
       <div class="randomiser-section-heading">Ingredients</div>
       <div class="ing-list open">
-        ${dinner.ingredients.map((i, ingIdx) => {
-          if (typeof i === 'string') return renderIngredientLine(i, null, null, '', `pick-${dinner.id}-ing-${ingIdx}`);
+        ${meal.ingredients.map((i, ingIdx) => {
+          if (typeof i === 'string') return renderIngredientLine(i, null, null, '', `pick-${meal.id}-ing-${ingIdx}`);
           const state = i.state ? `(${i.state})` : '';
-          return renderIngredientLine(i.name, i.amount, i.unit, state, `pick-${dinner.id}-ing-${ingIdx}`);
+          return renderIngredientLine(i.name, i.amount, i.unit, state, `pick-${meal.id}-ing-${ingIdx}`);
         }).join('')}
-        ${dinner.spices && dinner.spices.length ? `
+        ${meal.spices && meal.spices.length ? `
           <div class="spice-heading">Spices</div>
-          ${dinner.spices.map((s, spIdx) => renderIngredientLine(s, null, null, '', `pick-${dinner.id}-sp-${spIdx}`)).join('')}
+          ${meal.spices.map((s, spIdx) => renderIngredientLine(s, null, null, '', `pick-${meal.id}-sp-${spIdx}`)).join('')}
         ` : ''}
       </div>
-      ${dinner.steps ? `
+      ${meal.steps ? `
         <div class="randomiser-section-heading">Steps</div>
-        <div class="steps-list open">${escapeHtml(renumberStepsText(dinner.steps))}</div>
+        <div class="steps-list open">${escapeHtml(renumberStepsText(meal.steps))}</div>
       ` : ''}
     `;
     document.getElementById('pickModal').classList.remove('hidden');
@@ -2349,6 +2369,13 @@
   });
   document.getElementById('myIngredientsNameInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addInventoryItem();
+  });
+  document.getElementById('myIngredientsNameInput').addEventListener('input', (e) => {
+    const categorySelect = document.getElementById('myIngredientsCategorySelect');
+    if (categorySelect.value === '') {
+      const guess = guessInventoryCategory(e.target.value);
+      if (guess !== 'other') categorySelect.value = guess;
+    }
   });
   document.getElementById('searchInput').oninput = (e) => { searchTerm = e.target.value; currentPage = 1; renderCards(); };
   document.getElementById('pickBtn').onclick = handlePickForMe;
@@ -2588,8 +2615,8 @@
     currentUser = user;
 
     if (!user) {
-      dinnerDocRef = null;
-      dinners = [];
+      mealDocRef = null;
+      meals = [];
       friends = [];
       pendingShares = [];
       pendingFriendRequests = [];
