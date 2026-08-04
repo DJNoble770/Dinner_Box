@@ -9,7 +9,12 @@
 <body>
 
 <div class="app">
-  <div class="auth-screen" id="authScreen">
+  <div class="auth-screen" id="loadingScreen">
+    <h1>The Main Meal</h1>
+    <p class="subtitle">Loading…</p>
+  </div>
+
+  <div class="auth-screen hidden" id="authScreen">
     <h1>The Main Meal</h1>
     <p class="subtitle">Sign in to see your own dinner box</p>
     <div class="auth-form">
@@ -148,9 +153,14 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
       Pick for me
     </button>
+    <button class="btn-ghost" id="randomiserBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M8 3H3v5M16 21h5v-5M8 21H3v-5M4 4l7 7M20 4l-7 7M4 20l7-7M20 20l-7-7"/></svg>
+      Randomiser
+    </button>
   </div>
 
   <div class="grid" id="cardGrid"></div>
+  <div class="pagination" id="paginationRow"></div>
   </div>
 </div>
 
@@ -186,7 +196,7 @@
 
     <div class="account-body">
       <div class="account-tabs">
-        <button class="account-tab-btn active" data-tab="notifications" id="notificationsTabBtn">Notifications</button>
+        <button class="account-tab-btn active" data-tab="notifications" id="notificationsTabBtn">Requests</button>
         <button class="account-tab-btn" data-tab="friends">Friends</button>
         <button class="account-tab-btn" data-tab="settings">Settings</button>
       </div>
@@ -224,11 +234,58 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="randomiserModal">
+  <div class="modal-panel randomiser-modal-panel">
+    <div class="form-header">
+      <h3>Meal randomiser</h3>
+      <button id="randomiserModalCloseBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="randomiser-filters" id="randomiserFilters">
+      <button class="chip randomiser-filter-btn active" data-filter="any">Any</button>
+      <button class="chip randomiser-filter-btn" data-filter="highProtein">High protein</button>
+      <button class="chip randomiser-filter-btn" data-filter="lowCalorie">Low calorie</button>
+      <button class="chip randomiser-filter-btn" data-filter="vegetarian">Vegetarian</button>
+    </div>
+
+    <div>
+      <label class="field-label">Cooking method (click to exclude)</label>
+      <div class="randomiser-method-toggles" id="randomiserMethodToggles">
+        <button class="chip randomiser-method-btn active" data-method="oven">Oven</button>
+        <button class="chip randomiser-method-btn active" data-method="hob">Hob / pan</button>
+        <button class="chip randomiser-method-btn active" data-method="airfryer">Air fryer</button>
+        <button class="chip randomiser-method-btn active" data-method="grill">Grill</button>
+        <button class="chip randomiser-method-btn active" data-method="slow-cooker">Slow cooker</button>
+        <button class="chip randomiser-method-btn active" data-method="microwave">Microwave</button>
+        <button class="chip randomiser-method-btn active" data-method="bbq">BBQ</button>
+      </div>
+    </div>
+
+    <div class="randomiser-portions-row">
+      <label class="field-label">Portions</label>
+      <input class="field-input" id="randomiserPortionsInput" type="number" min="1" step="1" value="4">
+    </div>
+
+    <div class="randomiser-body" id="randomiserBody">
+      <p class="randomiser-placeholder">Pick your options and hit "Randomise" to get a suggestion. Recipes estimated to take over an hour are skipped automatically.</p>
+    </div>
+
+    <div class="form-actions">
+      <button class="save-btn" id="randomiserGoBtn">Randomise</button>
+      <button class="cancel-btn" id="randomiserAddBtn" disabled>Save Meal</button>
+      <button class="cancel-btn randomiser-block-btn" id="randomiserBlockBtn" disabled>Remove From Randomiser</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import { customDinnerIdeas } from "./dinner-ideas.js";
 
   const NOTIFY_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxpZKnTSXovzQvPZvxEqtQvq0L-WYClTqmKuXShDFr-jI9qCBGrZTMrXWO5zfueqoI/exec';
 
@@ -257,7 +314,9 @@
   let pendingShares = [];
   let pendingFriendRequests = [];
   let nickname = null;
+  let randomiserResult = null;
   let accountSettings = { hideMacros: false, disableSharing: false };
+  let blockedRandomiserIds = [];
 
   function sendEmailNotification(toEmail, line) {
     if (!toEmail) {
@@ -305,7 +364,7 @@
 
   const proteinMeta = id => PROTEINS.find(p => p.id === id) || PROTEINS[PROTEINS.length - 1];
 
-  const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'pinch', 'whole'];
+  const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'pinch', 'whole'];
 
   const FDC_API_KEY = 'Nx3We7Na5FftKtPxrorL6upc9VBHVHQrJHuq39ZQ';
   const UNIT_TO_GRAMS = { g: 1, kg: 1000, ml: 1, l: 1000, tsp: 5, tbsp: 15, cup: 240, oz: 28.3495, lb: 453.592 };
@@ -429,6 +488,105 @@
     return hasAny ? totals : null;
   }
 
+
+  const CUP_GRAMS_OVERRIDES = [
+    [/flour/i, 120],
+    [/\bsugar\b/i, 200],
+    [/(butter|shortening|margarine|lard)/i, 227],
+    [/\brice\b/i, 185],
+    [/\boats?\b/i, 90],
+    [/breadcrumbs?/i, 108],
+    [/cocoa/i, 90],
+    [/raisins?|sultanas?/i, 165],
+  ];
+
+  function gramsForIngredient(ing) {
+    if (ing.unit !== 'cup') return ing.amount * UNIT_TO_GRAMS[ing.unit];
+    const override = CUP_GRAMS_OVERRIDES.find(([pattern]) => pattern.test(ing.name));
+    return ing.amount * (override ? override[1] : UNIT_TO_GRAMS.cup);
+  }
+
+  async function estimateIngredientListMacros(ingredients) {
+    const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    let matchedCount = 0;
+
+    const lookups = ingredients
+      .filter(ing => ing.amount && UNIT_TO_GRAMS[ing.unit])
+      .map(async ing => {
+        const per100g = await fetchMacrosPer100g(ing.name, '');
+        if (!per100g) return;
+        const grams = gramsForIngredient(ing);
+        const scale = grams / 100;
+        ing.macros = {
+          calories: Math.round(per100g.calories * scale),
+          protein: Math.round(per100g.protein * scale * 10) / 10,
+          carbs: Math.round(per100g.carbs * scale * 10) / 10,
+          fat: Math.round(per100g.fat * scale * 10) / 10,
+        };
+      });
+
+    // Run every ingredient's lookup concurrently rather than one-at-a-time.
+    await Promise.all(lookups);
+
+    ingredients.forEach(ing => {
+      if (!ing.macros) return;
+      matchedCount++;
+      totals.calories += ing.macros.calories;
+      totals.protein += ing.macros.protein;
+      totals.carbs += ing.macros.carbs;
+      totals.fat += ing.macros.fat;
+    });
+
+    return { ...totals, matchedCount, totalCount: ingredients.length };
+  }
+
+  const RANDOMISER_MAX_MINUTES = 60;
+
+  function parseDinnerTimeMinutes(text) {
+    const raw = (text || '').trim().toLowerCase();
+    if (!raw) return null;
+    let total = 0;
+    let found = false;
+    const re = /(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|min)\b/g;
+    let m;
+    while ((m = re.exec(raw)) !== null) {
+      found = true;
+      const value = parseFloat(m[1]);
+      total += /^h/.test(m[2]) ? value * 60 : value;
+    }
+    if (found) return Math.round(total);
+    // Bare number with no unit, e.g. a stray "90" — treat as minutes.
+    const bare = raw.match(/^(\d+(?:\.\d+)?)$/);
+    return bare ? Math.round(parseFloat(bare[1])) : null;
+  }
+
+  async function runRandomiser(filterKey, disabledMethods) {
+    const pool = customDinnerIdeas.filter(d => {
+      if (blockedRandomiserIds.includes(d.id)) return false;
+      if (disabledMethods.has(d.method)) return false;
+      const minutes = parseDinnerTimeMinutes(d.time);
+      if (minutes !== null && minutes > RANDOMISER_MAX_MINUTES) return false;
+      if (filterKey === 'vegetarian' && d.protein !== 'other') return false;
+      return true;
+    });
+
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const maxAttempts = Math.min(shuffled.length, 15);
+
+    for (let i = 0; i < maxAttempts; i++) {
+      const dinner = shuffled[i];
+      const ingredients = dinner.ingredients.map(ing => ({ ...ing }));
+      const macros = await estimateIngredientListMacros(ingredients);
+
+      if (filterKey === 'highProtein' && macros.protein < 25) continue;
+      if (filterKey === 'lowCalorie' && macros.calories > 600) continue;
+
+      return { dinner, ingredients, macros, totalMinutes: parseDinnerTimeMinutes(dinner.time) };
+    }
+    return null;
+  }
+
+
   const STATES = [
     { value: '', label: '—' },
     { value: 'raw', label: 'Raw' },
@@ -506,6 +664,8 @@
 
   let dinners = [];
   let activeFilters = [];
+  const DINNERS_PER_PAGE = 9;
+  let currentPage = 1;
   let searchTerm = '';
   let editingId = null;
   let pickedId = null;
@@ -519,11 +679,20 @@
         friends = data.friends || [];
         nickname = data.nickname || null;
         accountSettings = { hideMacros: false, disableSharing: false, ...(data.settings || {}) };
+        blockedRandomiserIds = data.blockedRandomiserIds || [];
+
+        // One-time backfill: older accounts saved before acceptedFriendUids existed
+        // won't have it yet, which would otherwise block sharing under the tightened
+        // Firestore rules until something else happens to trigger a friends re-save.
+        if (data.acceptedFriendUids === undefined && friends.some(f => f.status === 'accepted')) {
+          saveFriends();
+        }
       } else {
         dinners = seedData;
         friends = [];
         nickname = null;
         accountSettings = { hideMacros: false, disableSharing: false };
+        blockedRandomiserIds = [];
         saveData();
       }
       updateHeaderDisplayName();
@@ -657,7 +826,12 @@
 
   function saveFriends() {
     if (!dinnerDocRef) return Promise.resolve();
-    return setDoc(dinnerDocRef, { friends }, { merge: true }).catch(e => {
+    // acceptedFriendUids is a plain scalar array mirroring the accepted subset of
+    // `friends` — kept alongside it purely so Firestore security rules can check
+    // "is this sender actually my accepted friend?" with a simple array-contains
+    // check, since rules can't easily search an array of objects by field.
+    const acceptedFriendUids = friends.filter(f => f.status === 'accepted').map(f => f.uid);
+    return setDoc(dinnerDocRef, { friends, acceptedFriendUids }, { merge: true }).catch(e => {
       console.error('Could not save friends list', e);
       alert('Could not save your friends list. ' + (e.message || ''));
     });
@@ -678,6 +852,14 @@
     return Promise.all([save1, save2]).catch(e => {
       console.error('Could not save settings', e);
       alert('Could not save your settings. ' + (e.message || ''));
+    });
+  }
+
+  function saveBlockedRandomiserIds() {
+    if (!dinnerDocRef) return Promise.resolve();
+    return setDoc(dinnerDocRef, { blockedRandomiserIds }, { merge: true }).catch(e => {
+      console.error('Could not save blocked meals', e);
+      alert('Could not save that block. ' + (e.message || ''));
     });
   }
 
@@ -717,7 +899,7 @@
     const allChip = document.createElement('button');
     allChip.className = 'chip' + (activeFilters.length === 0 ? ' active-all' : '');
     allChip.textContent = 'All';
-    allChip.onclick = () => { activeFilters = []; renderAll(); };
+    allChip.onclick = () => { activeFilters = []; currentPage = 1; renderAll(); };
     row.appendChild(allChip);
 
     PROTEINS.forEach(p => {
@@ -734,6 +916,7 @@
         activeFilters = activeFilters.includes(p.id)
           ? activeFilters.filter(f => f !== p.id)
           : [...activeFilters, p.id];
+        currentPage = 1;
         renderAll();
       };
       row.appendChild(chip);
@@ -766,10 +949,17 @@
       msg.className = 'empty-msg';
       msg.textContent = 'Nothing matches yet. Try a different filter, or add a new dinner idea.';
       grid.appendChild(msg);
+      renderPagination(0);
       return;
     }
 
-    filtered.forEach(dinner => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / DINNERS_PER_PAGE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    const startIdx = (currentPage - 1) * DINNERS_PER_PAGE;
+    const pageItems = filtered.slice(startIdx, startIdx + DINNERS_PER_PAGE);
+
+    pageItems.forEach(dinner => {
       const meta = proteinMeta(dinner.protein);
       const macroTotalsRaw = dinnerMacroTotals(dinner);
       const portions = dinner.portions && dinner.portions > 0 ? dinner.portions : null;
@@ -901,6 +1091,35 @@
 
       grid.appendChild(card);
     });
+
+    renderPagination(filtered.length);
+  }
+
+  function renderPagination(totalCount) {
+    const row = document.getElementById('paginationRow');
+    row.innerHTML = '';
+    const totalPages = Math.max(1, Math.ceil(totalCount / DINNERS_PER_PAGE));
+    if (totalPages <= 1) return;
+
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'btn-ghost pagination-btn';
+    prevBtn.textContent = '← Prev';
+    prevBtn.disabled = currentPage <= 1;
+    prevBtn.onclick = () => { currentPage--; renderCards(); };
+
+    const label = document.createElement('span');
+    label.className = 'pagination-label';
+    label.textContent = `Page ${currentPage} of ${totalPages}`;
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'btn-ghost pagination-btn';
+    nextBtn.textContent = 'Next →';
+    nextBtn.disabled = currentPage >= totalPages;
+    nextBtn.onclick = () => { currentPage++; renderCards(); };
+
+    row.appendChild(prevBtn);
+    row.appendChild(label);
+    row.appendChild(nextBtn);
   }
 
   function escapeHtml(str) {
@@ -1409,6 +1628,135 @@
     await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'friendRequests', req.id)).catch(e => console.error('Could not clear friend request', e));
   }
 
+  let randomiserFilter = 'any';
+
+  function openRandomiserModal() {
+    randomiserResult = null;
+    document.getElementById('randomiserBody').innerHTML = '<p class="randomiser-placeholder">Pick your options and hit "Randomise" to get a suggestion. Recipes estimated to take over an hour are skipped automatically.</p>';
+    document.getElementById('randomiserAddBtn').disabled = true;
+    document.getElementById('randomiserBlockBtn').disabled = true;
+    document.getElementById('randomiserModal').classList.remove('hidden');
+  }
+
+  function blockCurrentRandomiserResult() {
+    if (!randomiserResult) return;
+    const { dinner } = randomiserResult;
+    if (!blockedRandomiserIds.includes(dinner.id)) {
+      blockedRandomiserIds = [...blockedRandomiserIds, dinner.id];
+      saveBlockedRandomiserIds();
+    }
+    randomiserResult = null;
+    document.getElementById('randomiserAddBtn').disabled = true;
+    document.getElementById('randomiserBlockBtn').disabled = true;
+    document.getElementById('randomiserBody').innerHTML = `<p class="randomiser-placeholder">"${escapeHtml(dinner.name)}" won't be suggested to you again. Hit "Randomise" for another.</p>`;
+  }
+
+  function closeRandomiserModal() {
+    document.getElementById('randomiserModal').classList.add('hidden');
+  }
+
+  function renderRandomiserResult() {
+    const body = document.getElementById('randomiserBody');
+    if (!randomiserResult) return;
+    const { dinner, ingredients } = randomiserResult;
+    const meta = proteinMeta(dinner.protein);
+    const methodText = dinner.method ? methodLabel(dinner.method) : 'Method not specified';
+    const timeText = randomiserResult.totalMinutes !== null ? `≈ ${randomiserResult.totalMinutes} min` : (dinner.time || 'Time not specified');
+
+    body.innerHTML = `
+      <h4 class="randomiser-result-name">${escapeHtml(dinner.name)}</h4>
+      <div class="randomiser-result-meta">${escapeHtml(meta.label)} · ${escapeHtml(methodText)} · ${escapeHtml(timeText)}</div>
+      <div class="randomiser-macro-note" id="randomiserMacroNote"></div>
+      <div class="randomiser-section-heading">Ingredients</div>
+      <div class="ing-list open">
+        ${ingredients.map(i => {
+          const amt = [i.amount, i.unit].filter(Boolean).join(' ');
+          return `<div>- ${escapeHtml(i.name)}${amt ? ` — ${escapeHtml(amt)}` : ''}</div>`;
+        }).join('')}
+        ${dinner.spices && dinner.spices.length ? `
+          <div class="spice-heading">Spices</div>
+          ${dinner.spices.map(s => `<div>- ${escapeHtml(s)}</div>`).join('')}
+        ` : ''}
+      </div>
+      <div class="randomiser-section-heading">Steps</div>
+      <div class="steps-list open">${escapeHtml(renumberStepsText(dinner.steps || ''))}</div>
+    `;
+    updateRandomiserMacroNote();
+    document.getElementById('randomiserAddBtn').disabled = false;
+    document.getElementById('randomiserBlockBtn').disabled = false;
+  }
+
+  function updateRandomiserMacroNote() {
+    const noteEl = document.getElementById('randomiserMacroNote');
+    if (!noteEl || !randomiserResult) return;
+    const { macros } = randomiserResult;
+    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || 1);
+    const per = {
+      calories: Math.round(macros.calories / portions),
+      protein: Math.round(macros.protein / portions),
+      carbs: Math.round(macros.carbs / portions),
+      fat: Math.round(macros.fat / portions),
+    };
+    noteEl.textContent = `≈ ${per.calories} kcal · ${per.protein}g protein · ${per.carbs}g carbs · ${per.fat}g fat per portion (estimated from ${macros.matchedCount}/${macros.totalCount} ingredients, ${portions} portion${portions === 1 ? '' : 's'})`;
+  }
+
+  async function handleRandomiserGo() {
+    const body = document.getElementById('randomiserBody');
+    const goBtn = document.getElementById('randomiserGoBtn');
+    document.getElementById('randomiserAddBtn').disabled = true;
+    document.getElementById('randomiserBlockBtn').disabled = true;
+    body.innerHTML = '<p class="randomiser-loading">Finding a meal…</p>';
+    goBtn.disabled = true;
+    try {
+      const disabledMethods = new Set(
+        Array.from(document.querySelectorAll('.randomiser-method-btn:not(.active)')).map(b => b.dataset.method)
+      );
+      const result = await runRandomiser(randomiserFilter, disabledMethods);
+      if (!result) {
+        body.innerHTML = '<p class="randomiser-error">Couldn\'t find a match for those options — try again or loosen a filter.</p>';
+        randomiserResult = null;
+        return;
+      }
+      randomiserResult = result;
+      renderRandomiserResult();
+    } catch (e) {
+      console.error('Randomiser failed', e);
+      body.innerHTML = '<p class="randomiser-error">Something went wrong fetching a meal. Try again.</p>';
+      randomiserResult = null;
+    } finally {
+      goBtn.disabled = false;
+    }
+  }
+
+  function addRandomiserResultToBox() {
+    if (!randomiserResult) return;
+    const { dinner, ingredients } = randomiserResult;
+
+    const structuredIngredients = ingredients.map(i => ({
+      name: i.name, amount: i.amount, unit: i.unit, state: '', macros: i.macros || null,
+    }));
+
+    const portions = Math.max(1, parseInt(document.getElementById('randomiserPortionsInput').value, 10) || dinner.portions || 4);
+
+    const newDinner = {
+      id: 'dinner-' + Date.now(),
+      name: dinner.name,
+      protein: dinner.protein,
+      ingredients: structuredIngredients,
+      spices: [...(dinner.spices || [])],
+      method: dinner.method || '',
+      temp: dinner.temp || '',
+      time: dinner.time || '',
+      portions,
+      steps: dinner.steps || '',
+    };
+
+    dinners = [newDinner, ...dinners];
+    saveData();
+    renderAll();
+    closeRandomiserModal();
+  }
+
   function openMacrosModal() {
     const list = document.getElementById('macrosModalList');
     list.innerHTML = '';
@@ -1476,8 +1824,10 @@
   function handlePickForMe() {
     const filtered = getFiltered();
     if (filtered.length === 0) return;
-    const choice = filtered[Math.floor(Math.random() * filtered.length)];
+    const index = Math.floor(Math.random() * filtered.length);
+    const choice = filtered[index];
     pickedId = choice.id;
+    currentPage = Math.floor(index / DINNERS_PER_PAGE) + 1;
     renderCards();
     setTimeout(() => {
       const el = document.getElementById('dinner-' + choice.id);
@@ -1489,11 +1839,26 @@
   document.getElementById('formCloseBtn').onclick = closeForm;
   document.getElementById('cancelBtn').onclick = closeForm;
   document.getElementById('saveBtn').onclick = handleSave;
-  document.getElementById('searchInput').oninput = (e) => { searchTerm = e.target.value; renderCards(); };
+  document.getElementById('searchInput').oninput = (e) => { searchTerm = e.target.value; currentPage = 1; renderCards(); };
   document.getElementById('pickBtn').onclick = handlePickForMe;
   document.getElementById('addIngredientBtn').onclick = () => addIngredientRow('', '', 'g', '');
   document.getElementById('addSpiceBtn').onclick = () => addSpiceRow('');
   document.getElementById('macrosBtn').onclick = openMacrosModal;
+  document.getElementById('randomiserBtn').onclick = openRandomiserModal;
+  document.getElementById('randomiserModalCloseBtn').onclick = closeRandomiserModal;
+  document.getElementById('randomiserGoBtn').onclick = handleRandomiserGo;
+  document.getElementById('randomiserAddBtn').onclick = addRandomiserResultToBox;
+  document.getElementById('randomiserBlockBtn').onclick = blockCurrentRandomiserResult;
+  document.getElementById('randomiserPortionsInput').addEventListener('input', updateRandomiserMacroNote);
+  document.querySelectorAll('.randomiser-filter-btn').forEach(btn => {
+    btn.onclick = () => {
+      randomiserFilter = btn.dataset.filter;
+      document.querySelectorAll('.randomiser-filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+    };
+  });
+  document.querySelectorAll('.randomiser-method-btn').forEach(btn => {
+    btn.onclick = () => btn.classList.toggle('active');
+  });
   document.getElementById('macrosModalCloseBtn').onclick = closeMacrosModal;
   document.getElementById('macrosModalCancelBtn').onclick = closeMacrosModal;
   document.getElementById('macrosModalSaveBtn').onclick = saveMacrosModal;
@@ -1581,7 +1946,7 @@
   }
 
   function showScreen(id) {
-    ['authScreen', 'signUpScreen', 'verifyScreen', 'appContent'].forEach(sid => {
+    ['loadingScreen', 'authScreen', 'signUpScreen', 'verifyScreen', 'appContent'].forEach(sid => {
       document.getElementById(sid).classList.toggle('hidden', sid !== id);
     });
   }
@@ -1716,6 +2081,7 @@
       pendingFriendRequests = [];
       nickname = null;
       accountSettings = { hideMacros: false, disableSharing: false };
+      blockedRandomiserIds = [];
       updatePendingBadge();
       editingId = null;
       document.getElementById('formWrap').classList.add('hidden');
