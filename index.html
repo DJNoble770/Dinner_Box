@@ -359,7 +359,7 @@
   let randomiserResult = null;
   let accountSettings = { hideMacros: false, disableSharing: false };
   let blockedRandomiserIds = [];
-  let myIngredients = [];
+  let inventory = [];
 
   function sendEmailNotification(toEmail, line) {
     if (!toEmail) {
@@ -723,7 +723,7 @@
         nickname = data.nickname || null;
         accountSettings = { hideMacros: false, disableSharing: false, ...(data.settings || {}) };
         blockedRandomiserIds = data.blockedRandomiserIds || [];
-        myIngredients = data.myIngredients || [];
+        inventory = data.inventory || [];
 
         // One-time backfill: older accounts saved before acceptedFriendUids existed
         // won't have it yet, which would otherwise block sharing under the tightened
@@ -737,7 +737,7 @@
         nickname = null;
         accountSettings = { hideMacros: false, disableSharing: false };
         blockedRandomiserIds = [];
-        myIngredients = [];
+        inventory = [];
         saveData();
       }
       updateHeaderDisplayName();
