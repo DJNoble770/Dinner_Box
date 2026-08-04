@@ -378,6 +378,7 @@
   let pendingFriendRequests = [];
   let nickname = null;
   let randomiserResult = null;
+  let randomiserPreferredPortions = null;
   let accountSettings = { hideMacros: false, disableSharing: false };
   let blockedRandomiserIds = [];
   let inventory = [];
@@ -687,7 +688,11 @@
       return true;
     });
 
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const maxAttempts = Math.min(shuffled.length, 15);
 
     for (let i = 0; i < maxAttempts; i++) {
@@ -2175,7 +2180,8 @@
     const methodText = meal.method ? methodLabel(meal.method) : 'Method not specified';
     const timeText = randomiserResult.totalMinutes !== null ? `≈ ${randomiserResult.totalMinutes} min` : (meal.time || 'Time not specified');
 
-    document.getElementById('randomiserPortionsInput').value = meal.portions && meal.portions > 0 ? meal.portions : 4;
+    const defaultPortions = meal.portions && meal.portions > 0 ? meal.portions : 4;
+    document.getElementById('randomiserPortionsInput').value = randomiserPreferredPortions || defaultPortions;
 
     body.innerHTML = `
       <h4 class="randomiser-result-name">${escapeHtml(meal.name)}</h4>
@@ -2461,7 +2467,11 @@
   document.getElementById('randomiserGoBtn').onclick = handleRandomiserGo;
   document.getElementById('randomiserAddBtn').onclick = addRandomiserResultToBox;
   document.getElementById('randomiserBlockBtn').onclick = blockCurrentRandomiserResult;
-  document.getElementById('randomiserPortionsInput').addEventListener('input', updateRandomiserPortions);
+  document.getElementById('randomiserPortionsInput').addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    randomiserPreferredPortions = val > 0 ? val : null;
+    updateRandomiserPortions();
+  });
   document.querySelectorAll('.randomiser-filter-btn').forEach(btn => {
     btn.onclick = () => {
       randomiserFilter = btn.dataset.filter;
