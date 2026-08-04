@@ -769,7 +769,11 @@
     stopSync = onSnapshot(mealDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        meals = data.dinners || [];
+        meals = (data.dinners || []).map(m => ({
+          ...m,
+          name: m.name || 'Untitled meal',
+          ingredients: m.ingredients || [],
+        }));
         friends = data.friends || [];
         nickname = data.nickname || null;
         accountSettings = { hideMacros: false, disableSharing: false, ...(data.settings || {}) };
@@ -852,7 +856,7 @@
 
   async function acceptShare(share) {
     const newMeal = {
-      ...share.meal,
+      ...(share.meal || share.dinner),
       id: 'meal-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
       receivedFromUid: share.fromUid,
       sharedToUids: [],
@@ -1963,7 +1967,7 @@
       row.className = 'pending-share-row';
       row.innerHTML = `
         <div class="pending-share-info">
-          <span class="pending-share-name">${escapeHtml(share.meal ? share.meal.name : 'Unknown dish')}</span>
+          <span class="pending-share-name">${escapeHtml((share.meal || share.dinner) ? (share.meal || share.dinner).name : 'Unknown dish')}</span>
           <span class="pending-share-from">from ${escapeHtml(share.fromEmail || 'a friend')}</span>
         </div>
         <div class="pending-share-actions">
