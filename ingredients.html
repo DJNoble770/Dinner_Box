@@ -219,8 +219,14 @@
     }
   });
 
+  if (sessionStorage.getItem('mm-authed') === '1') {
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('appContent').classList.remove('hidden');
+  }
+
   async function doSignOut() {
     try {
+      sessionStorage.removeItem('mm-authed');
       await signOut(auth);
     } catch (e) {
       console.error('Sign out failed', e);
@@ -243,6 +249,7 @@
   onAuthStateChanged(auth, async (user) => {
     if (stopSync) { stopSync(); stopSync = null; }
     if (!user || !user.emailVerified) {
+      sessionStorage.removeItem('mm-authed');
       window.location.href = 'signin.html';
       return;
     }
@@ -250,9 +257,11 @@
       await user.getIdToken(true);
     } catch (e) {
       console.error('Session is no longer valid, signing out', e);
+      sessionStorage.removeItem('mm-authed');
       await signOut(auth).catch(() => {});
       return;
     }
+    sessionStorage.setItem('mm-authed', '1');
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');
     startSync(user.uid);

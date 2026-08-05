@@ -2308,8 +2308,18 @@
   document.getElementById('stepsInput').addEventListener('focus', handleStepsFocus);
   document.getElementById('tempInput').addEventListener('blur', handleTempBlur);
 
+  // If a previous page already confirmed this session is signed in, skip the
+  // loading screen and show the app immediately — handleAuthUser still runs
+  // in the background and will correct course (redirect to signin.html) if
+  // the session turns out to be invalid.
+  if (sessionStorage.getItem('mm-authed') === '1') {
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('appContent').classList.remove('hidden');
+  }
+
   async function doSignOut() {
     try {
+      sessionStorage.removeItem('mm-authed');
       await pendingSave;
       await signOut(auth);
     } catch (e) {
@@ -2326,6 +2336,7 @@
     currentUser = user;
 
     if (!user || !user.emailVerified) {
+      sessionStorage.removeItem('mm-authed');
       window.location.href = 'signin.html';
       return;
     }
@@ -2334,6 +2345,7 @@
       await user.getIdToken(true);
     } catch (e) {
       console.error('Session is no longer valid, signing out', e);
+      sessionStorage.removeItem('mm-authed');
       await signOut(auth).catch(() => {});
       return;
     }
@@ -2341,6 +2353,7 @@
     setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase() }, { merge: true })
       .catch(e => console.error('Could not update user directory entry', e));
 
+    sessionStorage.setItem('mm-authed', '1');
     updateHeaderDisplayName();
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');

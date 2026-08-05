@@ -221,6 +221,7 @@
     try {
       await auth.currentUser.reload();
       if (auth.currentUser.emailVerified) {
+        sessionStorage.setItem('mm-authed', '1');
         window.location.href = 'index.html';
       } else {
         showVerifyError('Still not verified yet — check your inbox and click the link, then try again.');
@@ -244,6 +245,7 @@
       showScreen('verifyScreen');
       return;
     }
+    sessionStorage.setItem('mm-authed', '1');
     window.location.href = 'index.html';
   });
 </script>
