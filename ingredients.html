@@ -223,11 +223,40 @@
   if (wasAlreadyAuthed) {
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');
+
+    // Paint from the last-known snapshot (shared with index.html's cache)
+    // immediately, instead of waiting on Firebase Auth/Firestore to resolve
+    // on this fresh page load. startSync() below reconciles once ready.
+    const cachedUid = sessionStorage.getItem('mm-uid');
+    if (cachedUid) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('mm-cache-' + cachedUid) || 'null');
+        if (cached && cached.inventory) {
+          inventory = cached.inventory;
+          populateInventoryUnitSelect();
+          populateInventoryCategorySelect();
+          renderInventoryList();
+        }
+      } catch (e) {
+        console.warn('Could not read cached inventory', e);
+      }
+    }
+  }
+
+  function cacheInventory(uid) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('mm-cache-' + uid) || 'null') || {};
+      cached.inventory = inventory;
+      localStorage.setItem('mm-cache-' + uid, JSON.stringify(cached));
+    } catch (e) {
+      // localStorage can be full or unavailable (e.g. private browsing) — not worth failing over.
+    }
   }
 
   async function doSignOut() {
     try {
       sessionStorage.removeItem('mm-authed');
+      sessionStorage.removeItem('mm-uid');
       await signOut(auth);
     } catch (e) {
       console.error('Sign out failed', e);
@@ -239,6 +268,7 @@
     mealDocRef = doc(db, "dinnerBox", uid);
     stopSync = onSnapshot(mealDocRef, (snapshot) => {
       inventory = snapshot.exists() ? (snapshot.data().inventory || []) : [];
+      cacheInventory(uid);
       populateInventoryUnitSelect();
       populateInventoryCategorySelect();
       renderInventoryList();
@@ -251,6 +281,7 @@
     if (stopSync) { stopSync(); stopSync = null; }
     if (!user || !user.emailVerified) {
       sessionStorage.removeItem('mm-authed');
+      sessionStorage.removeItem('mm-uid');
       window.location.href = 'signin.html';
       return;
     }
@@ -260,11 +291,13 @@
       } catch (e) {
         console.error('Session is no longer valid, signing out', e);
         sessionStorage.removeItem('mm-authed');
+        sessionStorage.removeItem('mm-uid');
         await signOut(auth).catch(() => {});
         return;
       }
     }
     sessionStorage.setItem('mm-authed', '1');
+    sessionStorage.setItem('mm-uid', user.uid);
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');
     startSync(user.uid);

@@ -756,6 +756,11 @@
         inventory = [];
         saveData();
       }
+      try {
+        localStorage.setItem('mm-cache-' + uid, JSON.stringify({ meals, accountSettings, inventory }));
+      } catch (e) {
+        // localStorage can be full or unavailable (e.g. private browsing) — not worth failing over.
+      }
       updateHeaderDisplayName();
       renderAll();
     }, (error) => {
@@ -2316,11 +2321,31 @@
   if (wasAlreadyAuthed) {
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');
+
+    // Paint from our own last-known snapshot immediately, rather than
+    // waiting on Firebase Auth to rehydrate and Firestore's cache read to
+    // resolve (both async on every fresh page load). startSync() below
+    // still runs and reconciles with the real data as soon as it's ready.
+    const cachedUid = sessionStorage.getItem('mm-uid');
+    if (cachedUid) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('mm-cache-' + cachedUid) || 'null');
+        if (cached) {
+          meals = cached.meals || [];
+          accountSettings = cached.accountSettings || accountSettings;
+          inventory = cached.inventory || [];
+          renderAll();
+        }
+      } catch (e) {
+        console.warn('Could not read cached meals', e);
+      }
+    }
   }
 
   async function doSignOut() {
     try {
       sessionStorage.removeItem('mm-authed');
+      sessionStorage.removeItem('mm-uid');
       await pendingSave;
       await signOut(auth);
     } catch (e) {
@@ -2338,6 +2363,7 @@
 
     if (!user || !user.emailVerified) {
       sessionStorage.removeItem('mm-authed');
+      sessionStorage.removeItem('mm-uid');
       window.location.href = 'signin.html';
       return;
     }
@@ -2352,6 +2378,7 @@
       } catch (e) {
         console.error('Session is no longer valid, signing out', e);
         sessionStorage.removeItem('mm-authed');
+        sessionStorage.removeItem('mm-uid');
         await signOut(auth).catch(() => {});
         return;
       }
@@ -2361,6 +2388,7 @@
       .catch(e => console.error('Could not update user directory entry', e));
 
     sessionStorage.setItem('mm-authed', '1');
+    sessionStorage.setItem('mm-uid', user.uid);
     updateHeaderDisplayName();
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');
