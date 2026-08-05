@@ -2312,7 +2312,8 @@
   // loading screen and show the app immediately — handleAuthUser still runs
   // in the background and will correct course (redirect to signin.html) if
   // the session turns out to be invalid.
-  if (sessionStorage.getItem('mm-authed') === '1') {
+  const wasAlreadyAuthed = sessionStorage.getItem('mm-authed') === '1';
+  if (wasAlreadyAuthed) {
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');
   }
@@ -2341,13 +2342,19 @@
       return;
     }
 
-    try {
-      await user.getIdToken(true);
-    } catch (e) {
-      console.error('Session is no longer valid, signing out', e);
-      sessionStorage.removeItem('mm-authed');
-      await signOut(auth).catch(() => {});
-      return;
+    // A forced token refresh is only needed once per session, right after
+    // sign-in/verification (so Firestore rules see an up-to-date
+    // email_verified claim) — repeating it on every page navigation just
+    // adds a network round trip before meal data can start loading.
+    if (!wasAlreadyAuthed) {
+      try {
+        await user.getIdToken(true);
+      } catch (e) {
+        console.error('Session is no longer valid, signing out', e);
+        sessionStorage.removeItem('mm-authed');
+        await signOut(auth).catch(() => {});
+        return;
+      }
     }
 
     setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase() }, { merge: true })

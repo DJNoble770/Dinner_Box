@@ -219,7 +219,8 @@
     }
   });
 
-  if (sessionStorage.getItem('mm-authed') === '1') {
+  const wasAlreadyAuthed = sessionStorage.getItem('mm-authed') === '1';
+  if (wasAlreadyAuthed) {
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('appContent').classList.remove('hidden');
   }
@@ -253,13 +254,15 @@
       window.location.href = 'signin.html';
       return;
     }
-    try {
-      await user.getIdToken(true);
-    } catch (e) {
-      console.error('Session is no longer valid, signing out', e);
-      sessionStorage.removeItem('mm-authed');
-      await signOut(auth).catch(() => {});
-      return;
+    if (!wasAlreadyAuthed) {
+      try {
+        await user.getIdToken(true);
+      } catch (e) {
+        console.error('Session is no longer valid, signing out', e);
+        sessionStorage.removeItem('mm-authed');
+        await signOut(auth).catch(() => {});
+        return;
+      }
     }
     sessionStorage.setItem('mm-authed', '1');
     document.getElementById('loadingScreen').classList.add('hidden');
