@@ -47,8 +47,9 @@
     </div>
     <div class="form-grid">
       <div>
-        <label class="field-label">Dish name</label>
+        <label class="field-label">Dish name <span class="field-required">*</span></label>
         <input class="field-input" id="nameInput" placeholder="e.g. Honey garlic chicken thighs">
+        <p class="field-error-msg hidden" id="nameInputError">Please enter a dish name.</p>
       </div>
       <div class="method-row">
         <div>
@@ -1482,6 +1483,8 @@
     document.getElementById('formTitle').textContent = meal ? 'Edit meal' : 'Create a meal';
     document.getElementById('saveBtn').textContent = meal ? 'Save changes' : 'Save Meal';
     document.getElementById('nameInput').value = meal ? meal.name : '';
+    document.getElementById('nameInput').classList.remove('field-invalid');
+    document.getElementById('nameInputError').classList.add('hidden');
     document.getElementById('methodInput').value = meal ? (meal.method || '') : '';
     document.getElementById('tempInput').value = meal ? (meal.temp || '') : '';
     document.getElementById('timeInput').value = meal ? (meal.time || '') : '';
@@ -1772,8 +1775,16 @@
   }
 
   function handleSave() {
-    const name = document.getElementById('nameInput').value.trim();
-    if (!name) return;
+    const nameInput = document.getElementById('nameInput');
+    const name = nameInput.value.trim();
+    if (!name) {
+      nameInput.classList.add('field-invalid');
+      document.getElementById('nameInputError').classList.remove('hidden');
+      nameInput.focus();
+      return;
+    }
+    nameInput.classList.remove('field-invalid');
+    document.getElementById('nameInputError').classList.add('hidden');
     const ingredients = getIngredientsFromForm();
     const spices = getSpicesFromForm();
     const method = document.getElementById('methodInput').value;
@@ -1908,8 +1919,14 @@
   async function addFriendByEmail() {
     const errorEl = document.getElementById('friendError');
     errorEl.classList.add('hidden');
-    const email = document.getElementById('friendEmailInput').value.trim().toLowerCase();
-    if (!email) return;
+    const emailInput = document.getElementById('friendEmailInput');
+    const email = emailInput.value.trim().toLowerCase();
+    if (!email) {
+      errorEl.textContent = 'Please enter an email address.';
+      errorEl.classList.remove('hidden');
+      emailInput.focus();
+      return;
+    }
 
     if (currentUser && email === currentUser.email.toLowerCase()) {
       errorEl.textContent = "You can't add yourself.";
@@ -2253,6 +2270,10 @@
   document.getElementById('formCloseBtn').onclick = closeForm;
   document.getElementById('cancelBtn').onclick = closeForm;
   document.getElementById('saveBtn').onclick = handleSave;
+  document.getElementById('nameInput').addEventListener('input', () => {
+    document.getElementById('nameInput').classList.remove('field-invalid');
+    document.getElementById('nameInputError').classList.add('hidden');
+  });
   document.getElementById('shoppingListBtn').onclick = openShoppingListModal;
   document.getElementById('shoppingListModalCloseBtn').onclick = closeShoppingListModal;
   document.getElementById('shoppingListClearBtn').onclick = clearShoppingList;

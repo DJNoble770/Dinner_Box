@@ -31,12 +31,13 @@
 
   <div class="myIngredients-view" id="myIngredientsView">
     <div class="ingredient-row myIngredients-add-row">
-      <input type="text" class="ing-name" id="myIngredientsNameInput" placeholder="Ingredient name">
+      <input type="text" class="ing-name" id="myIngredientsNameInput" placeholder="Ingredient name *">
       <input type="number" class="ing-amount" id="myIngredientsAmountInput" min="0" step="any" placeholder="Amount">
       <select class="ing-unit" id="myIngredientsUnitSelect"></select>
       <select class="ing-unit" id="myIngredientsCategorySelect"></select>
       <button type="button" class="save-btn" id="myIngredientsAddBtn">Add</button>
     </div>
+    <p class="field-error-msg hidden" id="myIngredientsNameError">Please enter an ingredient name.</p>
     <div class="myIngredients-sections" id="myIngredientsList"></div>
   </div>
   </div>
@@ -194,7 +195,14 @@
     const unitSelect = document.getElementById('myIngredientsUnitSelect');
     const categorySelect = document.getElementById('myIngredientsCategorySelect');
     const name = nameInput.value.trim();
-    if (!name) return;
+    if (!name) {
+      nameInput.classList.add('field-invalid');
+      document.getElementById('myIngredientsNameError').classList.remove('hidden');
+      nameInput.focus();
+      return;
+    }
+    nameInput.classList.remove('field-invalid');
+    document.getElementById('myIngredientsNameError').classList.add('hidden');
     inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value, category: categorySelect.value || 'other' }, ...inventory];
     saveInventory();
     renderInventoryList();
@@ -203,6 +211,11 @@
     categorySelect.value = '';
     nameInput.focus();
   }
+
+  document.getElementById('myIngredientsNameInput').addEventListener('input', () => {
+    document.getElementById('myIngredientsNameInput').classList.remove('field-invalid');
+    document.getElementById('myIngredientsNameError').classList.add('hidden');
+  });
 
   document.getElementById('myIngredientsAddBtn').onclick = addInventoryItem;
   document.getElementById('myIngredientsAmountInput').addEventListener('keydown', (e) => {

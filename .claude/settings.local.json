@@ -21,7 +21,8 @@
       "Bash(curl -s -i -X POST https://script.google.com/macros/s/AKfycbwJ2lWNuCCTRlq4tev3Ro9CsRSpN_-96su6vWbLdC2W5uhuxYurHk8u3a50VY6bgcNx/exec -H 'Content-Type: text/plain;charset=utf-8' -d '{\"to\":\"david.noble2005@gmail.com\",\"subject\":\"Test 2\",\"message\":\"Retest after confirming access is Anyone\"}' -o /dev/null -w 'HTTP_STATUS:%{http_code}\\\\n')",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"preferences.html open:\",o,\" close:\",c}' preferences.html)"
     ]
   }
 }

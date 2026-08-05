@@ -38,11 +38,19 @@
     <div class="preferences-section">
       <label class="field-label">What do you like?</label>
       <div class="randomiser-filters" id="likesChips"></div>
+      <div class="ing-btn-row preferences-other-row">
+        <input class="field-input" id="likesOtherInput" placeholder="Other — type something else you like">
+        <button type="button" class="add-ing-btn" id="likesOtherAddBtn">+ Add</button>
+      </div>
     </div>
 
     <div class="preferences-section">
       <label class="field-label">What do you dislike? <span class="preferences-hint">(the randomiser will skip meals containing these)</span></label>
       <div class="randomiser-filters" id="dislikesChips"></div>
+      <div class="ing-btn-row preferences-other-row">
+        <input class="field-input" id="dislikesOtherInput" placeholder="Other — type something else you dislike">
+        <button type="button" class="add-ing-btn" id="dislikesOtherAddBtn">+ Add</button>
+      </div>
     </div>
 
     <div class="form-actions preferences-actions">
@@ -99,7 +107,48 @@
       };
       dislikesWrap.appendChild(dislikeChip);
     });
+
+    // "Other" free-text entries — behave exactly like the preselected
+    // options (stored in the same likes/dislikes arrays, matched the same
+    // way by the randomiser), just not part of the curated chip grid.
+    [...likes].filter(item => !PREFERENCE_ITEMS.includes(item)).forEach(item => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip randomiser-filter-btn active';
+      chip.textContent = item + ' ×';
+      chip.title = 'Remove';
+      chip.onclick = () => { likes.delete(item); renderChips(); };
+      likesWrap.appendChild(chip);
+    });
+    [...dislikes].filter(item => !PREFERENCE_ITEMS.includes(item)).forEach(item => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip randomiser-filter-btn active';
+      chip.textContent = item + ' ×';
+      chip.title = 'Remove';
+      chip.onclick = () => { dislikes.delete(item); renderChips(); };
+      dislikesWrap.appendChild(chip);
+    });
   }
+
+  function addOtherItem(targetSet, otherSet, inputId) {
+    const input = document.getElementById(inputId);
+    const value = input.value.trim();
+    if (!value) return;
+    targetSet.add(value);
+    otherSet.delete(value);
+    input.value = '';
+    renderChips();
+  }
+
+  document.getElementById('likesOtherAddBtn').onclick = () => addOtherItem(likes, dislikes, 'likesOtherInput');
+  document.getElementById('likesOtherInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addOtherItem(likes, dislikes, 'likesOtherInput'); }
+  });
+  document.getElementById('dislikesOtherAddBtn').onclick = () => addOtherItem(dislikes, likes, 'dislikesOtherInput');
+  document.getElementById('dislikesOtherInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addOtherItem(dislikes, likes, 'dislikesOtherInput'); }
+  });
 
   async function savePreferences(uid) {
     const nickname = document.getElementById('prefNicknameInput').value.trim() || null;

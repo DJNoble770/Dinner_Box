@@ -142,11 +142,31 @@
   async function attemptSignUp() {
     const errorEl = document.getElementById('signUpError');
     errorEl.classList.add('hidden');
-    const email = document.getElementById('signUpEmail').value.trim();
-    const password = document.getElementById('signUpPassword').value;
-    const confirmPassword = document.getElementById('signUpPasswordConfirm').value;
+    const emailInput = document.getElementById('signUpEmail');
+    const passwordInput = document.getElementById('signUpPassword');
+    const confirmInput = document.getElementById('signUpPasswordConfirm');
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    const confirmPassword = confirmInput.value;
 
-    if (!email || !password || !confirmPassword) return;
+    if (!email) {
+      errorEl.textContent = 'Please enter an email address.';
+      errorEl.classList.remove('hidden');
+      emailInput.focus();
+      return;
+    }
+    if (!password) {
+      errorEl.textContent = 'Please enter a password.';
+      errorEl.classList.remove('hidden');
+      passwordInput.focus();
+      return;
+    }
+    if (!confirmPassword) {
+      errorEl.textContent = 'Please confirm your password.';
+      errorEl.classList.remove('hidden');
+      confirmInput.focus();
+      return;
+    }
     if (password !== confirmPassword) {
       errorEl.textContent = "Passwords don't match.";
       errorEl.classList.remove('hidden');
@@ -164,8 +184,20 @@
 
   async function attemptSignIn() {
     clearAuthError();
-    const email = document.getElementById('authEmail').value.trim();
-    const password = document.getElementById('authPassword').value;
+    const emailInput = document.getElementById('authEmail');
+    const passwordInput = document.getElementById('authPassword');
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email) {
+      showAuthError('Please enter your email address.');
+      emailInput.focus();
+      return;
+    }
+    if (!password) {
+      showAuthError('Please enter your password.');
+      passwordInput.focus();
+      return;
+    }
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       if (pendingGoogleCredential) {

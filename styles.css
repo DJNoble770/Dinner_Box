@@ -917,6 +917,23 @@ label.field-label {
   color: var(--ink);
   font-family: inherit;
 }
+
+.field-required {
+  color: #B23A3A;
+  margin-left: 1px;
+}
+
+.field-input.field-invalid, .field-textarea.field-invalid {
+  border-color: #B23A3A;
+  box-shadow: 0 0 0 1px #B23A3A;
+}
+
+.field-error-msg {
+  color: #B23A3A;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.field-error-msg.hidden { display: none; }
 .field-textarea { resize: vertical; }
 
 .ingredient-rows {
@@ -1269,4 +1286,14 @@ label.field-label {
 }
 .preferences-actions {
   margin-top: 28px;
+}
+.preferences-other-row {
+  margin-top: 10px;
+  align-items: center;
+}
+.preferences-other-row .field-input {
+  flex: 1;
+}
+.preferences-other-row .add-ing-btn {
+  flex-shrink: 0;
 }
