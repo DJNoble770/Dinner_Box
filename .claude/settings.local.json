@@ -18,7 +18,10 @@
       "Bash(git branch *)",
       "Bash(git commit *)",
       "Bash(curl -s -i -X POST https://script.google.com/macros/s/AKfycbwJ2lWNuCCTRlq4tev3Ro9CsRSpN_-96su6vWbLdC2W5uhuxYurHk8u3a50VY6bgcNx/exec -H 'Content-Type: text/plain;charset=utf-8' -d '{\"to\":\"david.noble2005@gmail.com\",\"subject\":\"Test from curl\",\"message\":\"This is a direct test of the Apps Script webhook.\"}')",
-      "Bash(curl -s -i -X POST https://script.google.com/macros/s/AKfycbwJ2lWNuCCTRlq4tev3Ro9CsRSpN_-96su6vWbLdC2W5uhuxYurHk8u3a50VY6bgcNx/exec -H 'Content-Type: text/plain;charset=utf-8' -d '{\"to\":\"david.noble2005@gmail.com\",\"subject\":\"Test 2\",\"message\":\"Retest after confirming access is Anyone\"}' -o /dev/null -w 'HTTP_STATUS:%{http_code}\\\\n')"
+      "Bash(curl -s -i -X POST https://script.google.com/macros/s/AKfycbwJ2lWNuCCTRlq4tev3Ro9CsRSpN_-96su6vWbLdC2W5uhuxYurHk8u3a50VY6bgcNx/exec -H 'Content-Type: text/plain;charset=utf-8' -d '{\"to\":\"david.noble2005@gmail.com\",\"subject\":\"Test 2\",\"message\":\"Retest after confirming access is Anyone\"}' -o /dev/null -w 'HTTP_STATUS:%{http_code}\\\\n')",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(python3 -)"
     ]
   }
 }
