@@ -796,7 +796,19 @@
     });
 
     stopSharedSync = onSnapshot(collection(db, "dinnerBox", uid, "shared"), (snapshot) => {
-      pendingShares = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // New shares (awaiting accept/decline) and silent updates to
+      // already-accepted shared meals both land in this same inbox
+      // collection — split them out and auto-apply the updates.
+      const newShares = [];
+      snapshot.docs.forEach(d => {
+        const data = d.data();
+        if (data.type === 'update') {
+          applySharedMealUpdate({ id: d.id, ...data });
+        } else {
+          newShares.push({ id: d.id, ...data });
+        }
+      });
+      pendingShares = newShares;
       updatePendingBadge();
       if (!document.getElementById('accountModal').classList.contains('hidden')) {
         renderPendingShares();
@@ -850,6 +862,7 @@
       ...(share.meal || share.dinner),
       id: 'meal-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
       receivedFromUid: share.fromUid,
+      receivedFromMealId: share.originalMealId || null,
       sharedToUids: [],
     };
     meals = [newMeal, ...meals];
@@ -860,6 +873,28 @@
 
   async function declineShare(share) {
     await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'shared', share.id)).catch(e => console.error('Could not clear shared item', e));
+  }
+
+  // Applies a silent update pushed by whoever originally shared a meal we
+  // already accepted — matched via receivedFromUid + receivedFromMealId,
+  // since our copy has its own local id. If we no longer have that meal
+  // (e.g. we deleted it), the update is just discarded.
+  async function applySharedMealUpdate(update) {
+    const idx = meals.findIndex(d =>
+      d.receivedFromUid === update.fromUid && d.receivedFromMealId === update.originalMealId);
+    if (idx !== -1) {
+      meals = meals.map((d, i) => i === idx ? {
+        ...d,
+        ...update.meal,
+        id: d.id,
+        receivedFromUid: d.receivedFromUid,
+        receivedFromMealId: d.receivedFromMealId,
+        sharedToUids: d.sharedToUids,
+      } : d);
+      await saveData();
+      renderAll();
+    }
+    await deleteDoc(doc(db, 'dinnerBox', currentUser.uid, 'shared', update.id)).catch(e => console.error('Could not clear meal update', e));
   }
 
   let pendingSave = Promise.resolve();
@@ -889,8 +924,10 @@
         return;
       }
 
-      const { id, sharedToUids, receivedFromUid, ...mealWithoutMeta } = meal;
+      const { id, sharedToUids, receivedFromUid, receivedFromMealId, ...mealWithoutMeta } = meal;
       await addDoc(collection(db, 'dinnerBox', friend.uid, 'shared'), {
+        type: 'share',
+        originalMealId: meal.id,
         meal: mealWithoutMeta,
         fromEmail: currentUser ? currentUser.email : '',
         fromUid: currentUser ? currentUser.uid : '',
@@ -906,6 +943,26 @@
       console.error('Could not share meal', e);
       alert('Could not share this meal. ' + (e.message || ''));
     }
+  }
+
+  // Pushes the current contents of a meal to everyone it's been shared
+  // with, so edits made after sharing (name, ingredients, steps, portions,
+  // etc.) show up for recipients too. Delivered through the same shared
+  // inbox used for new-share invites, but auto-applied on arrival rather
+  // than needing accept/decline (see applySharedMealUpdate).
+  async function propagateSharedMealUpdate(meal) {
+    const uids = meal.sharedToUids || [];
+    if (uids.length === 0) return;
+    const { id, sharedToUids, receivedFromUid, receivedFromMealId, ...mealWithoutMeta } = meal;
+    await Promise.all(uids.map(uid =>
+      addDoc(collection(db, 'dinnerBox', uid, 'shared'), {
+        type: 'update',
+        originalMealId: meal.id,
+        meal: mealWithoutMeta,
+        fromEmail: currentUser ? currentUser.email : '',
+        fromUid: currentUser ? currentUser.uid : '',
+      }).catch(e => console.error('Could not push meal update to a friend', e))
+    ));
   }
 
   document.addEventListener('click', () => {
@@ -1248,6 +1305,9 @@
       });
       return { ...d, portions: newPortions, ingredients: scaledIngredients };
     });
+
+    const updatedMeal = meals.find(d => d.id === mealId);
+    if (updatedMeal) propagateSharedMealUpdate(updatedMeal);
 
     saveData();
     renderAll();
@@ -1800,6 +1860,8 @@
       meals = meals.map(d => d.id === editingId
         ? { ...d, name, protein, ingredients, spices, method, temp, time, portions, steps }
         : d);
+      const updatedMeal = meals.find(d => d.id === editingId);
+      if (updatedMeal) propagateSharedMealUpdate(updatedMeal);
     } else {
       meals = [{ id: 'meal-' + Date.now(), name, protein, ingredients, spices, method, temp, time, portions, steps }, ...meals];
     }
