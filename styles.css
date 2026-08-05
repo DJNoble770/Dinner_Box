@@ -163,6 +163,11 @@ button {
 }
 .btn-primary.hidden { display: none; }
 
+a.btn-primary, a.btn-ghost {
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .fab-actions {
   position: absolute;
   bottom: 24px;
@@ -1228,4 +1233,11 @@ label.field-label {
     width: 100%;
     overflow-x: auto;
   }
+}
+
+.planner-placeholder {
+  margin-top: 40px;
+  text-align: center;
+  color: var(--panel-muted);
+  font-size: 15px;
 }
