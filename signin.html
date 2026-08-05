@@ -74,6 +74,11 @@
   // likes/dislikes before seeing the main menu.
   async function resolveLandingPage(uid) {
     try {
+      // Right after verifying, the cached ID token can still carry a stale
+      // email_verified: false claim until force-refreshed — without this,
+      // Firestore rules gating reads on that claim silently reject the
+      // getDoc below, which would otherwise wrongly default to index.html.
+      await auth.currentUser.getIdToken(true);
       const snap = await getDoc(doc(db, 'dinnerBox', uid));
       const onboarded = snap.exists() && snap.data().onboarded === true;
       return onboarded ? 'index.html' : 'preferences.html';
