@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en-GB">
 <head>
 <meta charset="UTF-8">
@@ -14,6 +14,53 @@
     <p class="subtitle">Loading…</p>
   </div>
 
+  <div class="auth-screen hidden" id="authScreen">
+    <h1>The Main Meal</h1>
+    <p class="subtitle">Sign in to see your own meal box</p>
+    <div class="auth-form">
+      <input class="field-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
+      <input class="field-input" id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
+      <p class="auth-error hidden" id="authError"></p>
+      <div class="auth-actions">
+        <button class="save-btn" id="signInBtn">Sign in</button>
+        <button class="cancel-btn" id="goToSignUpBtn">Create account</button>
+      </div>
+      <div class="auth-divider"><span>or</span></div>
+      <button class="google-btn" id="googleSignInBtn">
+        <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.4 0 10.3-2.1 14-5.5l-6.5-5.5C29.4 34.9 26.8 36 24 36c-5.3 0-9.7-3.1-11.3-7.4l-6.5 5C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.5C41.4 35.9 44 30.4 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <div class="auth-screen hidden" id="signUpScreen">
+    <h1>Create account</h1>
+    <p class="subtitle">Set up your own meal box</p>
+    <div class="auth-form">
+      <input class="field-input" id="signUpEmail" type="email" placeholder="Email" autocomplete="email">
+      <input class="field-input" id="signUpPassword" type="password" placeholder="Password" autocomplete="new-password">
+      <input class="field-input" id="signUpPasswordConfirm" type="password" placeholder="Confirm password" autocomplete="new-password">
+      <p class="auth-error hidden" id="signUpError"></p>
+      <div class="auth-actions">
+        <button class="save-btn" id="signUpSubmitBtn">Create account</button>
+        <button class="cancel-btn" id="signUpBackBtn">Back to sign in</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-screen hidden" id="verifyScreen">
+    <h1>Verify your email</h1>
+    <p class="subtitle" id="verifyEmailMsg">We've sent a verification link to your email.</p>
+    <p class="auth-error hidden" id="verifyError"></p>
+    <div class="auth-actions">
+      <button class="save-btn" id="verifyContinueBtn">I've verified — continue</button>
+    </div>
+    <div class="auth-actions">
+      <button class="cancel-btn" id="resendVerificationBtn">Resend email</button>
+      <button class="cancel-btn" id="verifySignOutBtn">Sign out</button>
+    </div>
+  </div>
+
   <div class="app-content hidden" id="appContent">
   <div class="top-right-account">
     <button class="user-email-btn" id="userEmailLabel"><span id="userEmailText"></span></button>
@@ -26,14 +73,11 @@
       <p class="subtitle" id="countLabel">0 meals on file</p>
     </div>
     <div class="header-actions">
-      <a class="btn-primary" href="ingredients.html">
+      <button class="btn-primary" id="myIngredientsBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 7l1.5 12a2 2 0 0 0 2 1.8h11a2 2 0 0 0 2-1.8L21 7M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         My Ingredients
-      </a>
-      <a class="btn-ghost" href="planner.html">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Weekly Planner
-      </a>
+      </button>
+      <button class="btn-ghost hidden" id="myIngredientsBackBtn">← Back to meals</button>
     </div>
   </div>
 
@@ -124,6 +168,17 @@
 
     <div class="grid" id="cardGrid"></div>
     <div class="pagination" id="paginationRow"></div>
+  </div>
+
+  <div class="myIngredients-view hidden" id="myIngredientsView">
+    <div class="ingredient-row myIngredients-add-row">
+      <input type="text" class="ing-name" id="myIngredientsNameInput" placeholder="Ingredient name">
+      <input type="number" class="ing-amount" id="myIngredientsAmountInput" min="0" step="any" placeholder="Amount">
+      <select class="ing-unit" id="myIngredientsUnitSelect"></select>
+      <select class="ing-unit" id="myIngredientsCategorySelect"></select>
+      <button type="button" class="save-btn" id="myIngredientsAddBtn">Add</button>
+    </div>
+    <div class="myIngredients-sections" id="myIngredientsList"></div>
   </div>
 
   <div class="fab-actions">
@@ -220,7 +275,7 @@
             Disable sharing to my account
           </label>
         </div>
-      </div>
+      </div>          
     </div>
   </div>
 </div>
@@ -288,14 +343,29 @@
 </div>
 
 <script type="module">
-  import { db, auth } from "./firebase-init.js";
-  import { doc, setDoc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-  import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, GoogleAuthProvider, signInWithPopup, linkWithCredential } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
   import { customMealIdeas } from "./meal-ideas.js";
 
   const NOTIFY_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwJ2lWNuCCTRlq4tev3Ro9CsRSpN_-96su6vWbLdC2W5uhuxYurHk8u3a50VY6bgcNx/exec';
   const NOTIFY_SHARED_SECRET = 'af3bb73d37c18abd052073fa7ab39fca811bd2e1';
 
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyADDooNjHzYrOHLigjXSVypWgGrZzW4VR8",
+    authDomain: "dinner-box-f8c64.firebaseapp.com",
+    projectId: "dinner-box-f8c64",
+    storageBucket: "dinner-box-f8c64.firebasestorage.app",
+    messagingSenderId: "285616906292",
+    appId: "1:285616906292:web:4d4b5b47afd19546e0aa61"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
   let mealDocRef = null;
   let stopSync = null;
   let stopSharedSync = null;
@@ -313,6 +383,7 @@
   let accountSettings = { hideMacros: false, disableSharing: false };
   let blockedRandomiserIds = [];
   let inventory = [];
+  let pendingGoogleCredential = null;
 
   function deriveFirstNameFromEmail(email) {
     const local = (email || '').split('@')[0];
@@ -471,9 +542,13 @@
     if (!result) return false;
     const { calories, protein, carbs, fat } = result;
     if ([calories, protein, carbs, fat].some(v => typeof v !== 'number' || isNaN(v) || v < 0)) return false;
+    // Nothing (not even pure oil) exceeds ~900 kcal/100g; catches miskeyed/garbage listings.
     if (calories > 900) return false;
+    // Cross-check stated calories against macro-derived calories (4/4/9 kcal per gram) with slack.
     const derived = protein * 4 + carbs * 4 + fat * 9;
     if (derived > 50 && (calories < derived * 0.5 || calories > derived * 2)) return false;
+    // Legume names asked for "cooked" data still often match a dry/raw listing
+    // (~20-25g protein/100g) instead of cooked (~7-10g/100g) — reject those matches.
     if (COOKED_BIAS_PATTERN.test(name || '') && protein > 15) return false;
     return true;
   }
@@ -548,6 +623,8 @@
     [/(beans?|lentils?|chickpeas?)/i, 175],
   ];
 
+  // Recipe measures for legumes mean cooked/canned, but a plain name search tends to
+  // match dry raw product listings (~2.5x the calories) — bias the lookup accordingly.
   const COOKED_BIAS_PATTERN = /(beans?|lentils?|chickpeas?)/i;
 
   function gramsForIngredient(ing) {
@@ -576,6 +653,7 @@
         };
       });
 
+    // Run every ingredient's lookup concurrently rather than one-at-a-time.
     await Promise.all(lookups);
 
     ingredients.forEach(ing => {
@@ -605,6 +683,7 @@
       total += /^h/.test(m[2]) ? value * 60 : value;
     }
     if (found) return Math.round(total);
+    // Bare number with no unit, e.g. a stray "90" — treat as minutes.
     const bare = raw.match(/^(\d+(?:\.\d+)?)$/);
     return bare ? Math.round(parseFloat(bare[1])) : null;
   }
@@ -634,6 +713,9 @@
       const portionsForFilter = meal.portions && meal.portions > 0 ? meal.portions : 4;
       const proteinPerPortion = macros.protein / portionsForFilter;
       const caloriesPerPortion = macros.calories / portionsForFilter;
+      // Require at least half the ingredients to have matched before trusting the
+      // estimate for filtering — a couple of noisy matches shouldn't be able to push
+      // an otherwise-unmatched (and possibly low-protein) dish over the threshold.
       const matchRatio = macros.totalCount > 0 ? macros.matchedCount / macros.totalCount : 0;
       if ((filterKey === 'highProtein' || filterKey === 'lowCalorie') && matchRatio < 0.5) continue;
       if (filterKey === 'highProtein' && proteinPerPortion < 40) continue;
@@ -744,6 +826,9 @@
         blockedRandomiserIds = data.blockedRandomiserIds || [];
         inventory = data.inventory || [];
 
+        // One-time backfill: older accounts saved before acceptedFriendUids existed
+        // won't have it yet, which would otherwise block sharing under the tightened
+        // Firestore rules until something else happens to trigger a friends re-save.
         if (data.acceptedFriendUids === undefined && friends.some(f => f.status === 'accepted')) {
           saveFriends();
         }
@@ -887,6 +972,10 @@
 
   function saveFriends() {
     if (!mealDocRef) return Promise.resolve();
+    // acceptedFriendUids is a plain scalar array mirroring the accepted subset of
+    // `friends` — kept alongside it purely so Firestore security rules can check
+    // "is this sender actually my accepted friend?" with a simple array-contains
+    // check, since rules can't easily search an array of objects by field.
     const acceptedFriendUids = friends.filter(f => f.status === 'accepted').map(f => f.uid);
     return setDoc(mealDocRef, { friends, acceptedFriendUids }, { merge: true }).catch(e => {
       console.error('Could not save friends list', e);
@@ -939,6 +1028,56 @@
     { id: 'tinned', label: 'Tinned & packet goods' },
     { id: 'other', label: 'Other' },
   ];
+  function openInventoryView() {
+    document.getElementById('mainMealView').classList.add('hidden');
+    document.getElementById('myIngredientsView').classList.remove('hidden');
+    document.getElementById('addBtn').classList.add('hidden');
+    document.getElementById('myIngredientsBtn').classList.add('hidden');
+    document.getElementById('myIngredientsBackBtn').classList.remove('hidden');
+    document.getElementById('pageTitle').textContent = 'My Ingredients';
+    document.getElementById('countLabel').textContent = "Keep track of what you've got in so you know what you can cook.";
+    populateInventoryUnitSelect();
+    populateInventoryCategorySelect();
+    renderInventoryList();
+  }
+
+  function closeInventoryView() {
+    document.getElementById('myIngredientsView').classList.add('hidden');
+    document.getElementById('mainMealView').classList.remove('hidden');
+    document.getElementById('addBtn').classList.remove('hidden');
+    document.getElementById('myIngredientsBtn').classList.remove('hidden');
+    document.getElementById('myIngredientsBackBtn').classList.add('hidden');
+    document.getElementById('pageTitle').textContent = 'The Main Meal';
+    renderCount();
+  }
+
+  function populateInventoryUnitSelect() {
+    const select = document.getElementById('myIngredientsUnitSelect');
+    if (select.options.length > 0) return;
+    UNITS.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.textContent = u;
+      select.appendChild(opt);
+    });
+  }
+
+  function populateInventoryCategorySelect() {
+    const select = document.getElementById('myIngredientsCategorySelect');
+    if (select.options.length > 0) return;
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Category';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+    INVENTORY_CATEGORIES.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.label;
+      select.appendChild(opt);
+    });
+  }
 
   function isIngredientInStock(name, neededAmount, neededUnit) {
     const target = (name || '').trim().toLowerCase();
@@ -1006,6 +1145,9 @@
         added.className = 'added-to-shopping-list-note';
         added.textContent = ' Item has been added to the Shopping List';
         btn.replaceWith(added);
+        if (!document.getElementById('myIngredientsView').classList.contains('hidden')) {
+          renderInventoryList();
+        }
       };
     });
   }
@@ -1044,6 +1186,63 @@
   const knownCategoryIds = new Set(INVENTORY_CATEGORIES.map(c => c.id));
   function resolveCategoryId(item) {
     return knownCategoryIds.has(item.category) ? item.category : 'other';
+  }
+
+  function renderInventoryList() {
+    const list = document.getElementById('myIngredientsList');
+    list.innerHTML = '';
+    const trackedInventory = inventory.filter(item => !item.shoppingOnly);
+    if (trackedInventory.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'myIngredients-empty';
+      p.textContent = 'Nothing added yet.';
+      list.appendChild(p);
+      return;
+    }
+
+    INVENTORY_CATEGORIES.forEach(cat => {
+      const itemsInCategory = inventory
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => !item.shoppingOnly && resolveCategoryId(item) === cat.id);
+      if (itemsInCategory.length === 0) return;
+
+      const section = document.createElement('div');
+      section.className = 'myIngredients-section';
+
+      const heading = document.createElement('div');
+      heading.className = 'myIngredients-section-heading';
+      heading.innerHTML = `<span>${escapeHtml(cat.label)}</span><span class="myIngredients-col-header"><span class="col-label">Empty</span><button class="remove-friend-btn col-spacer" tabindex="-1">Remove</button></span>`;
+      section.appendChild(heading);
+
+      const rows = document.createElement('div');
+      rows.className = 'myIngredients-list';
+
+      itemsInCategory.forEach(({ item, idx }) => {
+        const row = document.createElement('div');
+        row.className = 'myIngredients-row';
+        const amt = item.amount ? [item.amount, item.unit].filter(Boolean).join(' ') : '';
+        row.innerHTML = `
+          <span><span class="myIngredients-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="myIngredients-row-amount">${escapeHtml(amt)}</span>` : ''}</span>
+          <span class="myIngredients-row-actions">
+            <input type="checkbox" class="low-stock-check" ${item.lowStock ? 'checked' : ''}>
+            <button class="remove-friend-btn">Remove</button>
+          </span>
+        `;
+        row.querySelector('.low-stock-check').onchange = (e) => {
+          inventory = inventory.map((it, i) => i === idx ? { ...it, lowStock: e.target.checked } : it);
+          saveInventory();
+        };
+        row.querySelector('.remove-friend-btn').onclick = () => {
+          inventory = inventory.filter((_, i) => i !== idx);
+          saveInventory();
+          renderInventoryList();
+        };
+        rows.appendChild(row);
+      });
+
+      section.appendChild(rows);
+      list.appendChild(section);
+    });
   }
 
   function renderShoppingList() {
@@ -1092,6 +1291,9 @@
           }
           saveInventory();
           renderShoppingList();
+          if (!document.getElementById('myIngredientsView').classList.contains('hidden')) {
+            renderInventoryList();
+          }
         };
         rows.appendChild(row);
       });
@@ -1117,6 +1319,25 @@
     saveInventory();
     renderShoppingList();
     renderAll();
+    if (!document.getElementById('myIngredientsView').classList.contains('hidden')) {
+      renderInventoryList();
+    }
+  }
+
+  function addInventoryItem() {
+    const nameInput = document.getElementById('myIngredientsNameInput');
+    const amountInput = document.getElementById('myIngredientsAmountInput');
+    const unitSelect = document.getElementById('myIngredientsUnitSelect');
+    const categorySelect = document.getElementById('myIngredientsCategorySelect');
+    const name = nameInput.value.trim();
+    if (!name) return;
+    inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value, category: categorySelect.value || 'other' }, ...inventory];
+    saveInventory();
+    renderInventoryList();
+    nameInput.value = '';
+    amountInput.value = '';
+    categorySelect.value = '';
+    nameInput.focus();
   }
 
   function computeDisplayName() {
@@ -2224,9 +2445,25 @@
   document.getElementById('formCloseBtn').onclick = closeForm;
   document.getElementById('cancelBtn').onclick = closeForm;
   document.getElementById('saveBtn').onclick = handleSave;
+  document.getElementById('myIngredientsBtn').onclick = openInventoryView;
+  document.getElementById('myIngredientsBackBtn').onclick = closeInventoryView;
   document.getElementById('shoppingListBtn').onclick = openShoppingListModal;
   document.getElementById('shoppingListModalCloseBtn').onclick = closeShoppingListModal;
   document.getElementById('shoppingListClearBtn').onclick = clearShoppingList;
+  document.getElementById('myIngredientsAddBtn').onclick = addInventoryItem;
+  document.getElementById('myIngredientsAmountInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addInventoryItem();
+  });
+  document.getElementById('myIngredientsNameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addInventoryItem();
+  });
+  document.getElementById('myIngredientsNameInput').addEventListener('input', (e) => {
+    const categorySelect = document.getElementById('myIngredientsCategorySelect');
+    if (categorySelect.value === '') {
+      const guess = guessInventoryCategory(e.target.value);
+      if (guess !== 'other') categorySelect.value = guess;
+    }
+  });
   document.getElementById('searchInput').oninput = (e) => { searchTerm = e.target.value; currentPage = 1; renderCards(); };
   document.getElementById('pickBtn').onclick = handlePickForMe;
   document.getElementById('pickModalCloseBtn').onclick = closePickModal;
@@ -2308,18 +2545,137 @@
   document.getElementById('stepsInput').addEventListener('focus', handleStepsFocus);
   document.getElementById('tempInput').addEventListener('blur', handleTempBlur);
 
-  // If a previous page already confirmed this session is signed in, skip the
-  // loading screen and show the app immediately — handleAuthUser still runs
-  // in the background and will correct course (redirect to signin.html) if
-  // the session turns out to be invalid.
-  if (sessionStorage.getItem('mm-authed') === '1') {
-    document.getElementById('loadingScreen').classList.add('hidden');
-    document.getElementById('appContent').classList.remove('hidden');
+  function showAuthError(msg) {
+    const el = document.getElementById('authError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
   }
+
+  function clearAuthError() {
+    document.getElementById('authError').classList.add('hidden');
+  }
+
+  function showVerifyError(msg) {
+    const el = document.getElementById('verifyError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  function clearVerifyError() {
+    document.getElementById('verifyError').classList.add('hidden');
+  }
+
+  function friendlyAuthError(e) {
+    const map = {
+      'auth/invalid-email': 'That email address looks invalid.',
+      'auth/user-not-found': 'No account found with that email.',
+      'auth/wrong-password': 'Incorrect password.',
+      'auth/invalid-credential': 'Incorrect email or password.',
+      'auth/email-already-in-use': 'An account with that email already exists.',
+      'auth/weak-password': 'Password should be at least 6 characters.',
+    };
+    return map[e.code] || e.message;
+  }
+
+  function showScreen(id) {
+    ['loadingScreen', 'authScreen', 'signUpScreen', 'verifyScreen', 'appContent'].forEach(sid => {
+      document.getElementById(sid).classList.toggle('hidden', sid !== id);
+    });
+  }
+
+  function showSignUpScreen() {
+    document.getElementById('signUpEmail').value = document.getElementById('authEmail').value.trim();
+    document.getElementById('signUpPassword').value = '';
+    document.getElementById('signUpPasswordConfirm').value = '';
+    document.getElementById('signUpError').classList.add('hidden');
+    showScreen('signUpScreen');
+  }
+
+  function showSignInScreen() {
+    document.getElementById('authError').classList.add('hidden');
+    showScreen('authScreen');
+  }
+
+  async function attemptSignUp() {
+    const errorEl = document.getElementById('signUpError');
+    errorEl.classList.add('hidden');
+    const email = document.getElementById('signUpEmail').value.trim();
+    const password = document.getElementById('signUpPassword').value;
+    const confirmPassword = document.getElementById('signUpPasswordConfirm').value;
+
+    if (!email || !password || !confirmPassword) return;
+    if (password !== confirmPassword) {
+      errorEl.textContent = "Passwords don't match.";
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(cred.user);
+    } catch (e) {
+      errorEl.textContent = friendlyAuthError(e);
+      errorEl.classList.remove('hidden');
+    }
+  }
+
+  async function attemptSignIn() {
+    clearAuthError();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      if (pendingGoogleCredential) {
+        const toLink = pendingGoogleCredential;
+        pendingGoogleCredential = null;
+        await linkWithCredential(cred.user, toLink).catch(e => console.error('Could not link Google account', e));
+      }
+    } catch (e) {
+      showAuthError(friendlyAuthError(e));
+    }
+  }
+
+  document.getElementById('signInBtn').onclick = () => attemptSignIn();
+  document.getElementById('goToSignUpBtn').onclick = showSignUpScreen;
+  document.getElementById('signUpBackBtn').onclick = showSignInScreen;
+  document.getElementById('signUpSubmitBtn').onclick = attemptSignUp;
+
+  document.getElementById('googleSignInBtn').onclick = async () => {
+    clearAuthError();
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (e) {
+      if (e.code === 'auth/account-exists-with-different-credential') {
+        pendingGoogleCredential = GoogleAuthProvider.credentialFromError(e);
+        const existingEmail = e.customData && e.customData.email;
+        if (existingEmail) document.getElementById('authEmail').value = existingEmail;
+        document.getElementById('authPassword').value = '';
+        showAuthError('An account already exists with that email. Enter your password and sign in to link your Google account.');
+      } else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+        showAuthError(friendlyAuthError(e));
+      }
+    }
+  };
+
+  function handleAuthEnterKey(e) {
+    if (e.key !== 'Enter') return;
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    if (!email || !password) return;
+    attemptSignIn();
+  }
+  document.getElementById('authEmail').addEventListener('keydown', handleAuthEnterKey);
+  document.getElementById('authPassword').addEventListener('keydown', handleAuthEnterKey);
+
+  function handleSignUpEnterKey(e) {
+    if (e.key === 'Enter') attemptSignUp();
+  }
+  document.getElementById('signUpEmail').addEventListener('keydown', handleSignUpEnterKey);
+  document.getElementById('signUpPassword').addEventListener('keydown', handleSignUpEnterKey);
+  document.getElementById('signUpPasswordConfirm').addEventListener('keydown', handleSignUpEnterKey);
 
   async function doSignOut() {
     try {
-      sessionStorage.removeItem('mm-authed');
       await pendingSave;
       await signOut(auth);
     } catch (e) {
@@ -2327,6 +2683,31 @@
     }
   }
   document.getElementById('signOutBtn').onclick = doSignOut;
+  document.getElementById('verifySignOutBtn').onclick = doSignOut;
+
+  document.getElementById('resendVerificationBtn').onclick = async () => {
+    clearVerifyError();
+    try {
+      await sendEmailVerification(auth.currentUser);
+      showVerifyError('Verification email sent — check your inbox (and spam folder).');
+    } catch (e) {
+      showVerifyError(e.message);
+    }
+  };
+
+  document.getElementById('verifyContinueBtn').onclick = async () => {
+    clearVerifyError();
+    try {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        handleAuthUser(auth.currentUser);
+      } else {
+        showVerifyError('Still not verified yet — check your inbox and click the link, then try again.');
+      }
+    } catch (e) {
+      showVerifyError(e.message);
+    }
+  };
 
   async function handleAuthUser(user) {
     if (stopSync) { stopSync(); stopSync = null; }
@@ -2335,17 +2716,43 @@
     if (stopFriendConfirmSync) { stopFriendConfirmSync(); stopFriendConfirmSync = null; }
     currentUser = user;
 
-    if (!user || !user.emailVerified) {
-      sessionStorage.removeItem('mm-authed');
-      window.location.href = 'signin.html';
+    if (!user) {
+      mealDocRef = null;
+      meals = [];
+      friends = [];
+      pendingShares = [];
+      pendingFriendRequests = [];
+      nickname = null;
+      accountSettings = { hideMacros: false, disableSharing: false };
+      blockedRandomiserIds = [];
+      inventory = [];
+      updatePendingBadge();
+      editingId = null;
+      document.getElementById('formWrap').classList.add('hidden');
+      document.getElementById('accountModal').classList.add('hidden');
+      document.getElementById('myIngredientsView').classList.add('hidden');
+      document.getElementById('mainMealView').classList.remove('hidden');
+      document.getElementById('addBtn').classList.remove('hidden');
+      document.getElementById('authEmail').value = '';
+      document.getElementById('authPassword').value = '';
+      clearAuthError();
+      showScreen('authScreen');
       return;
     }
 
+    if (!user.emailVerified) {
+      document.getElementById('verifyEmailMsg').textContent = `We've sent a verification link to ${user.email}. Verify your email, then continue below.`;
+      clearVerifyError();
+      showScreen('verifyScreen');
+      return;
+    }
+
+    // Force-refresh the ID token so Firestore rules see an up-to-date email_verified claim
+    // (the token can otherwise stay stale right after verifying, in the same session).
     try {
       await user.getIdToken(true);
     } catch (e) {
       console.error('Session is no longer valid, signing out', e);
-      sessionStorage.removeItem('mm-authed');
       await signOut(auth).catch(() => {});
       return;
     }
@@ -2353,10 +2760,9 @@
     setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase() }, { merge: true })
       .catch(e => console.error('Could not update user directory entry', e));
 
-    sessionStorage.setItem('mm-authed', '1');
     updateHeaderDisplayName();
-    document.getElementById('loadingScreen').classList.add('hidden');
-    document.getElementById('appContent').classList.remove('hidden');
+    clearAuthError();
+    showScreen('appContent');
     startSync(user.uid);
   }
 

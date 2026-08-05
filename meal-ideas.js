@@ -410,7 +410,7 @@ export const customMealIdeas = [
   { id: "custom-137", name: "Beef and mushroom stir fry", protein: "beef",
     ingredients: [{ name: "Beef strips", amount: "250", unit: "g" }, { name: "Mushrooms", amount: "100", unit: "g" }, { name: "Rice", amount: "150", unit: "g" }, { name: "Soy sauce", amount: "1.5", unit: "tbsp" }, { name: "Garlic", amount: "1", unit: "" }], spices: ["Ground ginger", "Black pepper"], method: "hob", temp: "", time: "20 min", portions: 2,
     steps: "Fry beef until browned, set aside.\nStir fry mushrooms and garlic.\nReturn beef, add soy sauce, serve over rice." },
-  { id: "custom-138", name: "Pork and vegetable ramen", protein: "pork",
+  {  id: "custom-138", name: "Pork and vegetable ramen", protein: "pork",
     ingredients: [{ name: "Pork loin", amount: "200", unit: "g" }, { name: "Ramen noodles", amount: "125", unit: "g" }, { name: "Pork stock", amount: "0.5", unit: "l" }, { name: "Peppers", amount: "0.5", unit: "" }, { name: "Spring onion", amount: "0.5", unit: "" }], spices: ["Soy sauce", "Ground ginger"], method: "hob", temp: "", time: "25 min", portions: 2,
     steps: "Slice and sear pork.\nCook noodles in stock with peppers.\nTop with pork and spring onion." },
   { id: "custom-139", name: "Chicken and vegetable bake", protein: "chicken",
