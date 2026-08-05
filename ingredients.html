@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Ingredients — The Main Meal</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="auth-screen" id="loadingScreen">
+    <h1>The Main Meal</h1>
+    <p class="subtitle">Loading…</p>
+  </div>
+
+  <div class="app-content hidden" id="appContent">
+  <div class="top-right-account">
+    <button class="btn-ghost" id="signOutBtn">Sign out</button>
+  </div>
+
+  <div class="header-row">
+    <div>
+      <h1 id="pageTitle">My Ingredients</h1>
+      <p class="subtitle" id="countLabel">Keep track of what you've got in so you know what you can cook.</p>
+    </div>
+    <div class="header-actions">
+      <a class="btn-ghost" href="index.html">← Back to meals</a>
+    </div>
+  </div>
+
+  <div class="myIngredients-view" id="myIngredientsView">
+    <div class="ingredient-row myIngredients-add-row">
+      <input type="text" class="ing-name" id="myIngredientsNameInput" placeholder="Ingredient name">
+      <input type="number" class="ing-amount" id="myIngredientsAmountInput" min="0" step="any" placeholder="Amount">
+      <select class="ing-unit" id="myIngredientsUnitSelect"></select>
+      <select class="ing-unit" id="myIngredientsCategorySelect"></select>
+      <button type="button" class="save-btn" id="myIngredientsAddBtn">Add</button>
+    </div>
+    <div class="myIngredients-sections" id="myIngredientsList"></div>
+  </div>
+  </div>
+</div>
+
+<script type="module">
+  import { db, auth } from "./firebase-init.js";
+  import { doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+
+  let mealDocRef = null;
+  let stopSync = null;
+  let inventory = [];
+
+  const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'pinch', 'whole'];
+
+  const INVENTORY_CATEGORIES = [
+    { id: 'meat', label: 'Meat & fish' },
+    { id: 'dairy', label: 'Dairy & eggs' },
+    { id: 'vegetables', label: 'Vegetables' },
+    { id: 'fruit', label: 'Fruit' },
+    { id: 'dry', label: 'Dry ingredients' },
+    { id: 'spices', label: 'Spices & herbs' },
+    { id: 'sauces', label: 'Sauces & condiments' },
+    { id: 'tinned', label: 'Tinned & packet goods' },
+    { id: 'other', label: 'Other' },
+  ];
+
+  const CATEGORY_KEYWORDS = {
+    meat: ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'bacon', 'sausage', 'mince', 'steak', 'fish', 'salmon', 'tuna', 'prawn', 'shrimp', 'cod', 'ham'],
+    dairy: ['milk', 'cheese', 'butter', 'cream', 'yoghurt', 'yogurt', 'egg'],
+    vegetables: ['onion', 'garlic', 'carrot', 'potato', 'pepper', 'tomato', 'broccoli', 'spinach', 'mushroom', 'courgette', 'cucumber', 'lettuce', 'celery', 'leek', 'cabbage', 'sweetcorn', 'corn', 'aubergine'],
+    fruit: ['apple', 'banana', 'lemon', 'lime', 'orange', 'berry', 'berries', 'grape', 'mango', 'pineapple', 'pear', 'peach'],
+    dry: ['rice', 'pasta', 'flour', 'sugar', 'oats', 'lentil', 'lentils', 'bean', 'beans', 'noodle', 'noodles', 'quinoa', 'couscous', 'breadcrumb', 'breadcrumbs', 'spaghetti'],
+    spices: ['salt', 'pepper', 'paprika', 'cumin', 'basil', 'oregano', 'thyme', 'cinnamon', 'chilli', 'chili', 'herb', 'spice', 'turmeric', 'coriander', 'ginger', 'nutmeg', 'seasoning'],
+    sauces: ['sauce', 'ketchup', 'mayo', 'mayonnaise', 'mustard', 'vinegar', 'oil', 'stock', 'gravy', 'paste'],
+    tinned: ['tin', 'tinned', 'canned', 'can of'],
+    frozen: ['frozen'],
+  };
+  function guessInventoryCategory(name) {
+    const target = (name || '').trim().toLowerCase();
+    for (const cat of Object.keys(CATEGORY_KEYWORDS)) {
+      if (CATEGORY_KEYWORDS[cat].some(kw => target.includes(kw))) return cat;
+    }
+    return 'other';
+  }
+
+  const knownCategoryIds = new Set(INVENTORY_CATEGORIES.map(c => c.id));
+  function resolveCategoryId(item) {
+    return knownCategoryIds.has(item.category) ? item.category : 'other';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function saveInventory() {
+    if (!mealDocRef) return Promise.resolve();
+    return setDoc(mealDocRef, { inventory }, { merge: true }).catch(e => {
+      console.error('Could not save inventory', e);
+      alert('Could not save your inventory. ' + (e.message || ''));
+    });
+  }
+
+  function populateInventoryUnitSelect() {
+    const select = document.getElementById('myIngredientsUnitSelect');
+    if (select.options.length > 0) return;
+    UNITS.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.textContent = u;
+      select.appendChild(opt);
+    });
+  }
+
+  function populateInventoryCategorySelect() {
+    const select = document.getElementById('myIngredientsCategorySelect');
+    if (select.options.length > 0) return;
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Category';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+    INVENTORY_CATEGORIES.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.label;
+      select.appendChild(opt);
+    });
+  }
+
+  function renderInventoryList() {
+    const list = document.getElementById('myIngredientsList');
+    list.innerHTML = '';
+    const trackedInventory = inventory.filter(item => !item.shoppingOnly);
+    if (trackedInventory.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'myIngredients-empty';
+      p.textContent = 'Nothing added yet.';
+      list.appendChild(p);
+      return;
+    }
+
+    INVENTORY_CATEGORIES.forEach(cat => {
+      const itemsInCategory = inventory
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => !item.shoppingOnly && resolveCategoryId(item) === cat.id);
+      if (itemsInCategory.length === 0) return;
+
+      const section = document.createElement('div');
+      section.className = 'myIngredients-section';
+
+      const heading = document.createElement('div');
+      heading.className = 'myIngredients-section-heading';
+      heading.innerHTML = `<span>${escapeHtml(cat.label)}</span><span class="myIngredients-col-header"><span class="col-label">Empty</span><button class="remove-friend-btn col-spacer" tabindex="-1">Remove</button></span>`;
+      section.appendChild(heading);
+
+      const rows = document.createElement('div');
+      rows.className = 'myIngredients-list';
+
+      itemsInCategory.forEach(({ item, idx }) => {
+        const row = document.createElement('div');
+        row.className = 'myIngredients-row';
+        const amt = item.amount ? [item.amount, item.unit].filter(Boolean).join(' ') : '';
+        row.innerHTML = `
+          <span><span class="myIngredients-row-name">${escapeHtml(item.name)}</span>${amt ? `<span class="myIngredients-row-amount">${escapeHtml(amt)}</span>` : ''}</span>
+          <span class="myIngredients-row-actions">
+            <input type="checkbox" class="low-stock-check" ${item.lowStock ? 'checked' : ''}>
+            <button class="remove-friend-btn">Remove</button>
+          </span>
+        `;
+        row.querySelector('.low-stock-check').onchange = (e) => {
+          inventory = inventory.map((it, i) => i === idx ? { ...it, lowStock: e.target.checked } : it);
+          saveInventory();
+        };
+        row.querySelector('.remove-friend-btn').onclick = () => {
+          inventory = inventory.filter((_, i) => i !== idx);
+          saveInventory();
+          renderInventoryList();
+        };
+        rows.appendChild(row);
+      });
+
+      section.appendChild(rows);
+      list.appendChild(section);
+    });
+  }
+
+  function addInventoryItem() {
+    const nameInput = document.getElementById('myIngredientsNameInput');
+    const amountInput = document.getElementById('myIngredientsAmountInput');
+    const unitSelect = document.getElementById('myIngredientsUnitSelect');
+    const categorySelect = document.getElementById('myIngredientsCategorySelect');
+    const name = nameInput.value.trim();
+    if (!name) return;
+    inventory = [{ name, amount: amountInput.value.trim(), unit: unitSelect.value, category: categorySelect.value || 'other' }, ...inventory];
+    saveInventory();
+    renderInventoryList();
+    nameInput.value = '';
+    amountInput.value = '';
+    categorySelect.value = '';
+    nameInput.focus();
+  }
+
+  document.getElementById('myIngredientsAddBtn').onclick = addInventoryItem;
+  document.getElementById('myIngredientsAmountInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addInventoryItem();
+  });
+  document.getElementById('myIngredientsNameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addInventoryItem();
+  });
+  document.getElementById('myIngredientsNameInput').addEventListener('input', (e) => {
+    const categorySelect = document.getElementById('myIngredientsCategorySelect');
+    if (categorySelect.value === '') {
+      const guess = guessInventoryCategory(e.target.value);
+      if (guess !== 'other') categorySelect.value = guess;
+    }
+  });
+
+  async function doSignOut() {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error('Sign out failed', e);
+    }
+  }
+  document.getElementById('signOutBtn').onclick = doSignOut;
+
+  function startSync(uid) {
+    mealDocRef = doc(db, "dinnerBox", uid);
+    stopSync = onSnapshot(mealDocRef, (snapshot) => {
+      inventory = snapshot.exists() ? (snapshot.data().inventory || []) : [];
+      populateInventoryUnitSelect();
+      populateInventoryCategorySelect();
+      renderInventoryList();
+    }, (error) => {
+      console.error('Inventory sync error', error);
+    });
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    if (stopSync) { stopSync(); stopSync = null; }
+    if (!user || !user.emailVerified) {
+      window.location.href = 'signin.html';
+      return;
+    }
+    try {
+      await user.getIdToken(true);
+    } catch (e) {
+      console.error('Session is no longer valid, signing out', e);
+      await signOut(auth).catch(() => {});
+      return;
+    }
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('appContent').classList.remove('hidden');
+    startSync(user.uid);
+  });
+</script>
+
+</body>
+</html>
