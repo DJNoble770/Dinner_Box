@@ -25,7 +25,13 @@
       "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"preferences.html open:\",o,\" close:\",c}' preferences.html)",
       "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"index.html open:\",o,\" close:\",c}' index.html)",
       "Bash(grep -n \"import { doc, setDoc\" index.html)",
-      "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"open:\",o,\" close:\",c}' index.html)"
+      "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"open:\",o,\" close:\",c}' index.html)",
+      "Bash(node --check meal-ideas.js)",
+      "Bash(echo \"check exit: $?\")",
+      "Bash(sort -t- -k3 -n)",
+      "Bash(sort -t- -k2 -n)",
+      "Bash(awk 'BEGIN{o=0;c=0;ob=0;cb=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\); ob+=gsub\\(/\\\\[/,\"[\"\\); cb+=gsub\\(/\\\\]/,\"]\"\\)} END{print \"braces open:\",o,\" close:\",c; print \"brackets open:\",ob,\" close:\",cb}' meal-ideas.js)",
+      "PowerShell(cd C:\\\\Users\\\\dnoble\\\\Documents\\\\Dinner_Menu; node --version 2>&1; node --check meal-ideas.js 2>&1; echo \"exit: $LASTEXITCODE\")"
     ]
   }
 }

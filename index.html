@@ -325,13 +325,6 @@
   let initialSyncDone = false;
   let queuedConfirmations = [];
 
-  function deriveFirstNameFromEmail(email) {
-    const local = (email || '').split('@')[0];
-    const match = local.match(/^[a-zA-Z]+/);
-    const first = match ? match[0] : local;
-    return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : 'there';
-  }
-
   function sendEmailNotification(toEmail, line) {
     if (!toEmail) {
       console.warn('sendEmailNotification: no recipient email, skipping');
@@ -971,7 +964,7 @@
         ? { ...d, sharedToUids: [...(d.sharedToUids || []), friend.uid] }
         : d);
       await saveData();
-      sendEmailNotification(friend.email, `${currentUser.email} shared "${meal.name}" with you.`);
+      sendEmailNotification(friend.email, `${currentUser.email} shared "${meal.name}" with you on The Main Meal.`);
       openShareMealId = null;
       renderCards();
     } catch (e) {
@@ -2055,7 +2048,7 @@
         fromUid: currentUser.uid,
         fromEmail: currentUser.email,
       });
-      sendEmailNotification(email, `Hi ${deriveFirstNameFromEmail(email)},\n\n${currentUser.email} sent you a friend request on The Main Meal.`);
+      sendEmailNotification(email, `${currentUser.email} sent you a friend request on The Main Meal.`);
       document.getElementById('friendEmailInput').value = '';
       renderFriendsList();
     } catch (e) {
