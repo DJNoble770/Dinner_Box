@@ -734,6 +734,14 @@ a.btn-primary, a.btn-ghost {
 .settings-prefs-link {
   display: inline-flex;
   margin-top: 12px;
+  background: none;
+  border: 1px solid #C9B98F;
+  border-radius: 6px;
+  padding: 9px 16px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .randomiser-modal-panel { max-width: 560px; }
