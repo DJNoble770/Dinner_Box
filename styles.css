@@ -731,6 +731,11 @@ a.btn-primary, a.btn-ghost {
   padding: 8px 0;
 }
 
+.settings-prefs-link {
+  display: inline-flex;
+  margin-top: 12px;
+}
+
 .randomiser-modal-panel { max-width: 560px; }
 
 .randomiser-block-btn {
@@ -1240,4 +1245,20 @@ label.field-label {
   text-align: center;
   color: var(--panel-muted);
   font-size: 15px;
+}
+
+.preferences-view {
+  margin-top: 20px;
+  max-width: 640px;
+}
+.preferences-section {
+  margin-top: 24px;
+}
+.preferences-hint {
+  font-weight: 400;
+  color: var(--panel-muted);
+  font-size: 12px;
+}
+.preferences-actions {
+  margin-top: 28px;
 }

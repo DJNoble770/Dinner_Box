@@ -63,10 +63,25 @@
 </div>
 
 <script type="module">
-  import { auth } from "./firebase-init.js";
+  import { auth, db } from "./firebase-init.js";
   import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, GoogleAuthProvider, signInWithPopup, linkWithCredential } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
   let pendingGoogleCredential = null;
+
+  // New accounts (no dinnerBox doc yet, or one saved before the onboarded
+  // flag existed) land on preferences.html to set a nickname and food
+  // likes/dislikes before seeing the main menu.
+  async function resolveLandingPage(uid) {
+    try {
+      const snap = await getDoc(doc(db, 'dinnerBox', uid));
+      const onboarded = snap.exists() && snap.data().onboarded === true;
+      return onboarded ? 'index.html' : 'preferences.html';
+    } catch (e) {
+      console.error('Could not check onboarding status, defaulting to main menu', e);
+      return 'index.html';
+    }
+  }
 
   function showScreen(id) {
     ['loadingScreen', 'authScreen', 'signUpScreen', 'verifyScreen'].forEach(sid => {
@@ -222,7 +237,8 @@
       await auth.currentUser.reload();
       if (auth.currentUser.emailVerified) {
         sessionStorage.setItem('mm-authed', '1');
-        window.location.href = 'index.html';
+        sessionStorage.setItem('mm-uid', auth.currentUser.uid);
+        window.location.href = await resolveLandingPage(auth.currentUser.uid);
       } else {
         showVerifyError('Still not verified yet — check your inbox and click the link, then try again.');
       }
@@ -246,7 +262,10 @@
       return;
     }
     sessionStorage.setItem('mm-authed', '1');
-    window.location.href = 'index.html';
+    sessionStorage.setItem('mm-uid', user.uid);
+    resolveLandingPage(user.uid).then((target) => {
+      window.location.href = target;
+    });
   });
 </script>
 

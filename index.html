@@ -219,6 +219,7 @@
             <input type="checkbox" id="disableSharingToggle">
             Disable sharing to my account
           </label>
+          <a class="btn-ghost settings-prefs-link" href="preferences.html">Edit nickname &amp; food preferences</a>
         </div>
       </div>
     </div>
@@ -313,6 +314,7 @@
   let accountSettings = { hideMacros: false, disableSharing: false };
   let blockedRandomiserIds = [];
   let inventory = [];
+  let preferences = { likes: [], dislikes: [] };
 
   function deriveFirstNameFromEmail(email) {
     const local = (email || '').split('@')[0];
@@ -609,10 +611,24 @@
     return bare ? Math.round(parseFloat(bare[1])) : null;
   }
 
+  function mealContainsDislikedItem(meal) {
+    const dislikes = preferences.dislikes || [];
+    if (dislikes.length === 0) return false;
+    const names = [
+      ...meal.ingredients.map(i => typeof i === 'string' ? i : i.name),
+      ...(meal.spices || []),
+    ].map(n => (n || '').toLowerCase());
+    return dislikes.some(dislike => {
+      const dl = dislike.toLowerCase();
+      return names.some(name => name.includes(dl));
+    });
+  }
+
   async function runRandomiser(filterKey, disabledMethods) {
     const pool = customMealIdeas.filter(d => {
       if (blockedRandomiserIds.includes(d.id)) return false;
       if (disabledMethods.has(d.method)) return false;
+      if (mealContainsDislikedItem(d)) return false;
       const minutes = parseMealTimeMinutes(d.time);
       if (minutes !== null && minutes > RANDOMISER_MAX_MINUTES) return false;
       if (filterKey === 'vegetarian' && d.protein !== 'other') return false;
@@ -733,16 +749,23 @@
     stopSync = onSnapshot(mealDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        meals = (data.dinners || []).map(m => ({
+        const hasDinners = Array.isArray(data.dinners);
+        meals = hasDinners ? data.dinners.map(m => ({
           ...m,
           name: m.name || 'Untitled meal',
           ingredients: m.ingredients || [],
-        }));
+        })) : seedData;
         friends = data.friends || [];
         nickname = data.nickname || null;
         accountSettings = { hideMacros: false, disableSharing: false, ...(data.settings || {}) };
         blockedRandomiserIds = data.blockedRandomiserIds || [];
         inventory = data.inventory || [];
+        preferences = { likes: [], dislikes: [], ...(data.preferences || {}) };
+
+        // preferences.html can create this doc (nickname/preferences/onboarded)
+        // before any meals exist yet — seed the example meals the first time
+        // that happens, same as a brand new doc would get below.
+        if (!hasDinners) saveData();
 
         if (data.acceptedFriendUids === undefined && friends.some(f => f.status === 'accepted')) {
           saveFriends();
@@ -754,10 +777,11 @@
         accountSettings = { hideMacros: false, disableSharing: false };
         blockedRandomiserIds = [];
         inventory = [];
+        preferences = { likes: [], dislikes: [] };
         saveData();
       }
       try {
-        localStorage.setItem('mm-cache-' + uid, JSON.stringify({ meals, accountSettings, inventory }));
+        localStorage.setItem('mm-cache-' + uid, JSON.stringify({ meals, accountSettings, inventory, preferences }));
       } catch (e) {
         // localStorage can be full or unavailable (e.g. private browsing) — not worth failing over.
       }
@@ -2334,6 +2358,7 @@
           meals = cached.meals || [];
           accountSettings = cached.accountSettings || accountSettings;
           inventory = cached.inventory || [];
+          preferences = cached.preferences || preferences;
           renderAll();
         }
       } catch (e) {

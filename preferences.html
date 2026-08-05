@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Preferences — The Main Meal</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+  <div class="auth-screen" id="loadingScreen">
+    <h1>The Main Meal</h1>
+    <p class="subtitle">Loading…</p>
+  </div>
+
+  <div class="app-content hidden" id="appContent">
+  <div class="top-right-account">
+    <button class="btn-ghost" id="signOutBtn">Sign out</button>
+  </div>
+
+  <div class="header-row">
+    <div>
+      <h1 id="pageTitle">Your Preferences</h1>
+      <p class="subtitle" id="pageSubtitle">Tell us a bit about what you eat.</p>
+    </div>
+    <div class="header-actions">
+      <a class="btn-ghost" href="index.html" id="backLink">← Back to meals</a>
+    </div>
+  </div>
+
+  <div class="preferences-view">
+    <div>
+      <label class="field-label">Nickname</label>
+      <input class="field-input" id="prefNicknameInput" placeholder="What should we call you?">
+    </div>
+
+    <div class="preferences-section">
+      <label class="field-label">What do you like?</label>
+      <div class="randomiser-filters" id="likesChips"></div>
+    </div>
+
+    <div class="preferences-section">
+      <label class="field-label">What do you dislike? <span class="preferences-hint">(the randomiser will skip meals containing these)</span></label>
+      <div class="randomiser-filters" id="dislikesChips"></div>
+    </div>
+
+    <div class="form-actions preferences-actions">
+      <button class="save-btn" id="prefsSaveBtn">Save</button>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script type="module">
+  import { db, auth } from "./firebase-init.js";
+  import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+
+  const PREFERENCE_ITEMS = [
+    'Chicken', 'Beef', 'Pork', 'Bacon', 'Sausage', 'Fish', 'Salmon', 'Tuna', 'Prawns',
+    'Milk', 'Cheese', 'Cream', 'Yoghurt', 'Egg',
+    'Onion', 'Garlic', 'Carrot', 'Potato', 'Pepper', 'Tomato', 'Broccoli', 'Spinach',
+    'Mushroom', 'Courgette', 'Cucumber', 'Aubergine',
+    'Apple', 'Banana', 'Lemon', 'Lime',
+    'Rice', 'Pasta', 'Lentils', 'Beans', 'Chickpeas',
+    'Chilli', 'Ginger', 'Curry',
+    'Mayonnaise', 'Mustard', 'Vinegar',
+  ];
+
+  let mealDocRef = null;
+  let likes = new Set();
+  let dislikes = new Set();
+
+  function renderChips() {
+    const likesWrap = document.getElementById('likesChips');
+    const dislikesWrap = document.getElementById('dislikesChips');
+    likesWrap.innerHTML = '';
+    dislikesWrap.innerHTML = '';
+
+    PREFERENCE_ITEMS.forEach(item => {
+      const likeChip = document.createElement('button');
+      likeChip.type = 'button';
+      likeChip.className = 'chip randomiser-filter-btn' + (likes.has(item) ? ' active' : '');
+      likeChip.textContent = item;
+      likeChip.onclick = () => {
+        if (likes.has(item)) likes.delete(item); else { likes.add(item); dislikes.delete(item); }
+        renderChips();
+      };
+      likesWrap.appendChild(likeChip);
+
+      const dislikeChip = document.createElement('button');
+      dislikeChip.type = 'button';
+      dislikeChip.className = 'chip randomiser-filter-btn' + (dislikes.has(item) ? ' active' : '');
+      dislikeChip.textContent = item;
+      dislikeChip.onclick = () => {
+        if (dislikes.has(item)) dislikes.delete(item); else { dislikes.add(item); likes.delete(item); }
+        renderChips();
+      };
+      dislikesWrap.appendChild(dislikeChip);
+    });
+  }
+
+  async function savePreferences(uid) {
+    const nickname = document.getElementById('prefNicknameInput').value.trim() || null;
+    mealDocRef = mealDocRef || doc(db, 'dinnerBox', uid);
+    try {
+      await setDoc(mealDocRef, {
+        nickname,
+        preferences: { likes: [...likes], dislikes: [...dislikes] },
+        onboarded: true,
+      }, { merge: true });
+      window.location.href = 'index.html';
+    } catch (e) {
+      console.error('Could not save preferences', e);
+      alert('Could not save your preferences. ' + (e.message || ''));
+    }
+  }
+
+  document.getElementById('prefsSaveBtn').onclick = () => {
+    if (auth.currentUser) savePreferences(auth.currentUser.uid);
+  };
+
+  async function doSignOut() {
+    try {
+      sessionStorage.removeItem('mm-authed');
+      sessionStorage.removeItem('mm-uid');
+      await signOut(auth);
+    } catch (e) {
+      console.error('Sign out failed', e);
+    }
+  }
+  document.getElementById('signOutBtn').onclick = doSignOut;
+
+  renderChips();
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user || !user.emailVerified) {
+      sessionStorage.removeItem('mm-authed');
+      sessionStorage.removeItem('mm-uid');
+      window.location.href = 'signin.html';
+      return;
+    }
+
+    mealDocRef = doc(db, 'dinnerBox', user.uid);
+    try {
+      const snap = await getDoc(mealDocRef);
+      const data = snap.exists() ? snap.data() : {};
+      document.getElementById('prefNicknameInput').value = data.nickname || '';
+      likes = new Set((data.preferences && data.preferences.likes) || []);
+      dislikes = new Set((data.preferences && data.preferences.dislikes) || []);
+      renderChips();
+
+      // First-time setup (no onboarded flag yet) shows different copy and
+      // hides the back link, since there's nothing to go back to yet.
+      if (data.onboarded !== true) {
+        document.getElementById('pageTitle').textContent = 'Welcome to The Main Meal';
+        document.getElementById('pageSubtitle').textContent = "Let's set up your account before you dive in.";
+        document.getElementById('backLink').classList.add('hidden');
+      }
+    } catch (e) {
+      console.error('Could not load existing preferences', e);
+    }
+
+    sessionStorage.setItem('mm-authed', '1');
+    sessionStorage.setItem('mm-uid', user.uid);
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('appContent').classList.remove('hidden');
+  });
+</script>
+
+</body>
+</html>
