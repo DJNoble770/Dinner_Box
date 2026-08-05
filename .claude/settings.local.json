@@ -23,7 +23,9 @@
       "Bash(git push *)",
       "Bash(python3 -)",
       "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"preferences.html open:\",o,\" close:\",c}' preferences.html)",
-      "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"index.html open:\",o,\" close:\",c}' index.html)"
+      "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"index.html open:\",o,\" close:\",c}' index.html)",
+      "Bash(grep -n \"import { doc, setDoc\" index.html)",
+      "Bash(awk 'BEGIN{o=0;c=0} {o+=gsub\\(/{/,\"{\"\\); c+=gsub\\(/}/,\"}\"\\)} END{print \"open:\",o,\" close:\",c}' index.html)"
     ]
   }
 }

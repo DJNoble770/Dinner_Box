@@ -291,7 +291,7 @@
 
 <script type="module">
   import { db, auth } from "./firebase-init.js";
-  import { doc, setDoc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { doc, setDoc, getDoc, onSnapshot, collection, query, where, orderBy, limit, getDocs, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
   import { customMealIdeas } from "./meal-ideas.js";
 
@@ -316,6 +316,14 @@
   let blockedRandomiserIds = [];
   let inventory = [];
   let preferences = { likes: [], dislikes: [] };
+  // Guards against a race where a friend confirmation (see
+  // stopFriendConfirmSync below) arrives and gets applied against `friends`
+  // before the main doc sync has loaded it for the first time this session
+  // — which would silently drop the confirmation, or worse, persist an
+  // incomplete friends list back to Firestore. Confirmations that arrive
+  // too early are queued and applied once the initial sync has landed.
+  let initialSyncDone = false;
+  let queuedConfirmations = [];
 
   function deriveFirstNameFromEmail(email) {
     const local = (email || '').split('@')[0];
@@ -746,6 +754,8 @@
   let pickedId = null;
 
   function startSync(uid) {
+    initialSyncDone = false;
+    queuedConfirmations = [];
     mealDocRef = doc(db, "dinnerBox", uid);
     stopSync = onSnapshot(mealDocRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -788,6 +798,13 @@
       }
       updateHeaderDisplayName();
       renderAll();
+
+      if (!initialSyncDone) {
+        initialSyncDone = true;
+        const queue = queuedConfirmations;
+        queuedConfirmations = [];
+        queue.forEach(({ confirmation, docRef }) => applyFriendConfirmation(confirmation, docRef));
+      }
     }, (error) => {
       console.error('Sync error, showing local view only', error);
       meals = seedData;
@@ -831,16 +848,34 @@
       snapshot.docChanges().forEach(change => {
         if (change.type !== 'added') return;
         const confirmation = change.doc.data();
-        friends = friends.map(f => f.uid === confirmation.fromUid ? { ...f, status: 'accepted' } : f);
-        saveFriends();
-        if (!document.getElementById('accountModal').classList.contains('hidden')) {
-          renderFriendsList();
+        if (!initialSyncDone) {
+          // The main friends list hasn't loaded yet this session — applying
+          // now would either miss the match or persist an incomplete
+          // friends array back to Firestore. Queue it; startSync's first
+          // successful snapshot drains this once `friends` is authoritative.
+          queuedConfirmations.push({ confirmation, docRef: change.doc.ref });
+          return;
         }
-        deleteDoc(change.doc.ref).catch(e => console.error('Could not clear friend confirmation', e));
+        applyFriendConfirmation(confirmation, change.doc.ref);
       });
     }, (error) => {
       console.error('Friend confirmation sync error', error);
     });
+  }
+
+  function applyFriendConfirmation(confirmation, docRef) {
+    const alreadyFriend = friends.some(f => f.uid === confirmation.fromUid);
+    friends = alreadyFriend
+      ? friends.map(f => f.uid === confirmation.fromUid ? { ...f, status: 'accepted' } : f)
+      // Self-healing fallback: if our own record of adding them somehow
+      // isn't there (shouldn't normally happen), don't just drop the
+      // confirmation — add them as accepted so the relationship isn't lost.
+      : [{ uid: confirmation.fromUid, email: confirmation.fromEmail, status: 'accepted' }, ...friends];
+    saveFriends();
+    if (!document.getElementById('accountModal').classList.contains('hidden')) {
+      renderFriendsList();
+    }
+    deleteDoc(docRef).catch(e => console.error('Could not clear friend confirmation', e));
   }
 
   function updatePendingBadge() {
@@ -2002,7 +2037,11 @@
     }
 
     try {
-      const q = query(collection(db, 'users'), where('email', '==', email));
+      // If an old account was deleted and its email reused, a stale
+      // users/{uid} doc under that email can linger alongside the current
+      // one — order by updatedAt so the live, actively-signed-in account
+      // wins rather than an arbitrary (possibly dead) match.
+      const q = query(collection(db, 'users'), where('email', '==', email), orderBy('updatedAt', 'desc'), limit(1));
       const snap = await getDocs(q);
       if (snap.empty) {
         errorEl.textContent = 'No account found with that email.';
@@ -2492,7 +2531,10 @@
       }
     }
 
-    setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase() }, { merge: true })
+    // updatedAt lets addFriendByEmail pick the live account when an email
+    // is reused after an old account was deleted, leaving a stale orphaned
+    // users/{uid} doc behind under the same email (see addFriendByEmail).
+    setDoc(doc(db, "users", user.uid), { email: user.email.toLowerCase(), updatedAt: serverTimestamp() }, { merge: true })
       .catch(e => console.error('Could not update user directory entry', e));
 
     sessionStorage.setItem('mm-authed', '1');
